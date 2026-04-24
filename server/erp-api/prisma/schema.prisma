@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChannelCode {
+  SHOPEE
+}
+
+enum ShopStatus {
+  AUTHORIZED
+  DISCONNECTED
+}
+
+model ChannelShop {
+  id        String       @id @default(cuid())
+  channel   ChannelCode  @default(SHOPEE)
+  siteCode  String       @default("BR") @map("site_code")
+  shopId    String       @unique @map("shop_id")
+  shopName  String       @map("shop_name")
+  status    ShopStatus   @default(AUTHORIZED)
+  rawJson   Json         @map("raw_json")
+  createdAt DateTime     @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3) @map("updated_at")
+  token     ChannelToken?
+  products  ErpProduct[]
+  orders    ErpOrder[]
+  packages  ErpOrderPackage[]
+
+  @@map("channel_shop")
+}
+
+model ChannelToken {
+  id           String      @id @default(cuid())
+  channel      ChannelCode @default(SHOPEE)
+  shopId       String      @unique @map("shop_id")
+  accessToken  String      @db.Text @map("access_token")
+  refreshToken String      @db.Text @map("refresh_token")
+  expireAt     DateTime    @db.Timestamptz(3) @map("expire_at")
+  rawJson      Json        @map("raw_json")
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  shop         ChannelShop @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@map("channel_token")
+}
+
+model ErpProduct {
+  id                String      @id @default(cuid())
+  channel           ChannelCode @default(SHOPEE)
+  siteCode          String      @default("BR") @map("site_code")
+  shopId            String      @map("shop_id")
+  platformProductId String      @map("platform_product_id")
+  title             String
+  status            String
+  stock             Int         @default(0)
+  price             Decimal     @db.Decimal(18, 2)
+  rawJson           Json        @map("raw_json")
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  shop              ChannelShop @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+
+  @@unique([shopId, platformProductId])
+  @@index([channel, siteCode, shopId])
+  @@map("erp_product")
+}
+
+model ErpOrder {
+  id              String      @id @default(cuid())
+  channel         ChannelCode @default(SHOPEE)
+  siteCode        String      @default("BR") @map("site_code")
+  shopId          String      @map("shop_id")
+  orderNo         String      @unique @map("order_no")
+  orderStatus     String      @map("order_status")
+  buyerName       String?     @map("buyer_name")
+  currency        String      @default("BRL")
+  totalAmount     Decimal     @db.Decimal(18, 2) @map("total_amount")
+  createdAtRemote DateTime?   @db.Timestamptz(3) @map("created_at_remote")
+  rawJson         Json        @map("raw_json")
+  createdAt       DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  shop            ChannelShop @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  packages        ErpOrderPackage[]
+
+  @@index([channel, siteCode, shopId])
+  @@map("erp_order")
+}
+
+model ErpOrderPackage {
+  id                       String      @id @default(cuid())
+  channel                  ChannelCode @default(SHOPEE)
+  siteCode                 String      @default("BR") @map("site_code")
+  shopId                   String      @map("shop_id")
+  orderId                  String?     @map("order_id")
+  orderNo                  String      @map("order_no")
+  orderSn                  String      @map("order_sn")
+  packageNumber            String      @unique @map("package_number")
+  trackingNumber           String?     @map("tracking_number")
+  packageStatus            String?     @map("package_status")
+  packageFulfillmentStatus String?     @map("package_fulfillment_status")
+  logisticsStatus          String?     @map("logistics_status")
+  shippingCarrier          String?     @map("shipping_carrier")
+  logisticsChannelId       Int?        @map("logistics_channel_id")
+  logisticsChannelName     String?     @map("logistics_channel_name")
+  serviceCode              String?     @map("service_code")
+  shippingDocumentStatus   String?     @map("shipping_document_status")
+  shippingDocumentType     String?     @map("shipping_document_type")
+  documentUrl              String?     @db.Text @map("document_url")
+  downloadRef              Json?       @map("download_ref")
+  logisticsProfile         String?     @map("logistics_profile")
+  parcelItemCount          Int         @default(0) @map("parcel_item_count")
+  latestPackageUpdateTime  DateTime?   @db.Timestamptz(3) @map("latest_package_update_time")
+  lastDocumentSyncTime     DateTime?   @db.Timestamptz(3) @map("last_document_sync_time")
+  rawFragment              Json?       @map("raw_fragment")
+  sourceRaw                Json?       @map("source_raw")
+  lastSyncTime             DateTime?   @db.Timestamptz(3) @map("last_sync_time")
+  createdAt                DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt                DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  shop                     ChannelShop @relation(fields: [shopId], references: [shopId], onDelete: Cascade)
+  order                    ErpOrder?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([channel, siteCode, shopId])
+  @@index([shopId, orderNo])
+  @@index([shopId, orderSn])
+  @@index([orderId])
+  @@index([logisticsStatus])
+  @@index([logisticsChannelId])
+  @@index([shippingDocumentStatus])
+  @@map("erp_order_package")
+}
+
+model ShopeeOrderSyncLog {
+  id                    String   @id @default(cuid())
+  triggerType           String   @map("trigger_type")
+  shopId                String?  @map("shop_id")
+  orderNo               String?  @map("order_no")
+  orderSn               String?  @map("order_sn")
+  packageNumber         String?  @map("package_number")
+  requestPayloadSummary Json?    @map("request_payload_summary")
+  resultStatus          String   @map("result_status")
+  changedFields         Json?    @map("changed_fields")
+  detailSource          String?  @map("detail_source")
+  packageSource         String?  @map("package_source")
+  message               String?  @db.Text
+  createdAt             DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+
+  @@index([shopId, createdAt])
+  @@index([orderNo, createdAt])
+  @@index([orderSn, createdAt])
+  @@index([triggerType, createdAt])
+  @@map("shopee_order_sync_log")
+}
