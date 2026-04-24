@@ -100,6 +100,12 @@ export default [
         name: 'product-list',
         component: './product/list',
       },
+      {
+        path: '/product/create',
+        name: 'product-create',
+        hideInMenu: true,
+        component: './product/create',
+      },
     ],
   },
   {
