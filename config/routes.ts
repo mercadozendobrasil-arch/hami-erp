@@ -109,6 +109,22 @@ export default [
     ],
   },
   {
+    path: '/reports',
+    name: 'reports',
+    icon: 'barChart',
+    routes: [
+      {
+        path: '/reports',
+        redirect: '/reports/metabase',
+      },
+      {
+        path: '/reports/metabase',
+        name: 'metabase-reports',
+        component: './reports/metabase',
+      },
+    ],
+  },
+  {
     path: '/order',
     name: 'order',
     icon: 'profile',

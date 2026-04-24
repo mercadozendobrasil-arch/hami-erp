@@ -239,6 +239,38 @@ declare namespace ERP {
     price: string;
   };
 
+  type MetabaseEmbedConfig = {
+    enabled: boolean;
+    siteUrl?: string;
+    defaultDashboardId?: string;
+  };
+
+  type MetabaseEmbedOptions = {
+    bordered?: boolean;
+    titled?: boolean;
+    theme?: 'light' | 'night';
+    refreshSeconds?: number;
+  };
+
+  type MetabaseDashboardEmbedRequest = {
+    dashboardId?: string;
+    params?: Record<string, unknown>;
+    options?: MetabaseEmbedOptions;
+  };
+
+  type MetabaseDashboardEmbedData = {
+    url: string;
+    dashboardId: string;
+    expiresInSeconds: number;
+    params: Record<string, unknown>;
+    options: {
+      bordered: boolean;
+      titled: boolean;
+      theme?: 'light' | 'night';
+      refreshSeconds?: number;
+    };
+  };
+
   type RuleConfigItem = {
     id: string;
     ruleCode: string;

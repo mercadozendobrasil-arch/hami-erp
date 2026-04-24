@@ -10,6 +10,9 @@ export type AppEnvironment = {
   SHOPEE_REDIRECT_URL: string;
   REDIS_URL?: string;
   REDIS_PREFIX: string;
+  METABASE_SITE_URL?: string;
+  METABASE_EMBED_SECRET?: string;
+  METABASE_DEFAULT_DASHBOARD_ID?: string;
 };
 
 function normalizeValue(value: string | undefined) {
@@ -76,5 +79,10 @@ export function validateEnvironment(config: EnvRecord): AppEnvironment {
     SHOPEE_REDIRECT_URL: shopeeRedirectUrl as string,
     REDIS_URL: normalizeValue(config.REDIS_URL),
     REDIS_PREFIX: normalizeValue(config.REDIS_PREFIX) || 'shopee-erp',
+    METABASE_SITE_URL: normalizeValue(config.METABASE_SITE_URL),
+    METABASE_EMBED_SECRET: normalizeValue(config.METABASE_EMBED_SECRET),
+    METABASE_DEFAULT_DASHBOARD_ID: normalizeValue(
+      config.METABASE_DEFAULT_DASHBOARD_ID,
+    ),
   };
 }

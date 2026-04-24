@@ -1,61 +1,58 @@
 import { request } from '@umijs/max';
 
-type RawShopRecord = Record<string, unknown>;
-
-function toStringValue(value: unknown, fallback = '-') {
-  if (typeof value === 'string' && value.trim()) {
-    return value;
-  }
-  if (typeof value === 'number' || typeof value === 'bigint') {
-    return String(value);
-  }
-  return fallback;
-}
-
-function normalizeShopRecord(record: RawShopRecord): ERP.ShopListItem {
-  return {
-    shopId: toStringValue(record.shopId ?? record.id ?? record.externalShopId),
-    shopName: toStringValue(record.shopName ?? record.name),
-    siteCode: toStringValue(record.siteCode ?? record.region ?? record.site),
-    channel: toStringValue(record.channel, 'SHOPEE'),
-    status: toStringValue(record.status, 'UNKNOWN'),
-    tokenExpireAt:
-      typeof record.tokenExpireAt === 'string' ? record.tokenExpireAt : null,
-    productCount:
-      typeof record.productCount === 'number' ? record.productCount : 0,
-    orderCount:
-      typeof record.orderCount === 'number' ? record.orderCount : 0,
-    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : undefined,
-  };
-}
-
 export async function getShopeeAuthUrl() {
-  return request<ERP.ShopeeAuthUrlResponse>('/api/shopee/auth/url', {
-    method: 'GET',
-  });
-}
-
-export async function queryShops(params: ERP.PageParams) {
-  const response = await request<API.ListResponse<RawShopRecord>>('/api/shops', {
-    method: 'GET',
-    params: {
-      current: params.current,
-      pageSize: params.pageSize,
-      shopId: params.shopId,
-      status: params.status,
+  const response = await request<
+    ERP.ShopeeAuthUrlResponse & { authorizationUrl?: string; redirectUri?: string }
+  >('/api/shopee/auth/authorize-url', {
+    method: 'POST',
+    data: {
+      redirectUri: `${window.location.origin}/shop/auth`,
     },
   });
 
   return {
     ...response,
-    success: response.success ?? true,
-    total: response.total ?? 0,
-    data: (response.data || []).map(normalizeShopRecord),
+    url: response.url || response.authorizationUrl || '',
+    redirectUrl: response.redirectUrl || response.redirectUri || '',
   };
 }
 
-export async function syncShopeeOrdersByShop(shopId: string) {
-  return request<ERP.ShopSyncResult>(`/api/shops/${shopId}/sync/orders`, {
-    method: 'POST',
+export async function submitShopeeAuthCallback(payload: {
+  code: string;
+  shopId: string;
+}) {
+  return request<ERP.ApiResponse<{ shopId: string; shopName?: string }>>(
+    '/api/shopee/auth/callback',
+    {
+      method: 'POST',
+      data: payload,
+    },
+  );
+}
+
+export async function queryShops(params: ERP.PageParams) {
+  return request<API.ListResponse<ERP.ShopListItem>>('/api/erp/shops', {
+    method: 'GET',
+    params,
   });
 }
+
+export async function syncShop(shopId: string) {
+  return request<ERP.ApiResponse<ERP.ShopListItem>>(
+    `/api/erp/shops/${shopId}/sync`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function refreshToken(shopId: string) {
+  return request<ERP.ApiResponse<Record<string, unknown>>>(
+    `/api/erp/shops/${shopId}/refresh-token`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export const syncShopeeOrdersByShop = syncShop;

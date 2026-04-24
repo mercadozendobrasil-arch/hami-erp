@@ -9,7 +9,7 @@ const PendingOrderPage: React.FC = () => {
       headerTitle="待处理订单池"
       currentTab="pending"
       alertType="info"
-      alertMessage="当前页聚合 Shopee 主链路中全部待处理状态"
+      alertMessage="当前页聚合 Shopee 主链路中的全部待处理状态"
       alertDescription="适合运营、审单、仓配团队统一查看从待付款、待补发票、待出货到异常分支的处理进度。"
     />
   );

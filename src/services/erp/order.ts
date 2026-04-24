@@ -27,6 +27,10 @@ import orderNormalize from './order.normalize';
 
 type RawOrderRecord = Record<string, unknown>;
 
+const allowOrderMockFallback =
+  process.env.NODE_ENV === 'development' &&
+  process.env.ERP_ORDER_FALLBACK_MOCK === 'true';
+
 const {
   isNormalizedOrderDetail,
   normalizeBackendOrder,
@@ -44,7 +48,15 @@ async function requestWithFallback<T>(
       return await request<T>(url, { method, params });
     }
     return await request<T>(url, { method, data: params });
-  } catch {
+  } catch (error) {
+    if (!allowOrderMockFallback) {
+      throw error;
+    }
+
+    console.warn(
+      `[erp-order] Falling back to mock data for ${url}.`,
+      error,
+    );
     return fallback();
   }
 }
@@ -84,21 +96,12 @@ function normalizeBackendOrderListResponse(response: API.ListResponse<RawOrderRe
 }
 
 export async function queryOrders(params: ERP.OrderQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<RawOrderRecord>>(
-    '/api/orders',
+  const response = await requestStrict<API.ListResponse<ERP.OrderListItem>>(
+    '/api/erp/orders',
     'GET',
-    () => mockQueryOrders(params),
     params,
   );
-  const hasBackendShape = response.data?.some(
-    (item) =>
-      typeof item === 'object' &&
-      item &&
-      ('createdAtRemote' in item || 'order_sn' in item || 'rawJson' in item),
-  );
-  return hasBackendShape
-    ? normalizeBackendOrderListResponse(response)
-    : normalizeOrderListResponse(response as API.ListResponse<ERP.OrderListItem>);
+  return normalizeOrderListResponse(response);
 }
 
 export async function queryAbnormalOrders(params: ERP.OrderQueryParams) {
@@ -148,15 +151,31 @@ export async function queryWarehouseOrders(params: ERP.OrderQueryParams) {
   return normalizeOrderListResponse(response);
 }
 
-export async function getOrderDetail(id: string) {
-  const response = await requestWithFallback<ERP.ApiResponse<ERP.OrderDetail | RawOrderRecord>>(
-    `/api/orders/${id}`,
+export async function getOrderDetail(id: string, shopId?: string) {
+  const response = await requestStrict<ERP.ApiResponse<ERP.OrderDetail | RawOrderRecord>>(
+    `/api/erp/orders/${id}`,
     'GET',
-    () => ({ success: true, data: mockGetOrderDetail(id) }),
+    { shopId },
   );
   return isNormalizedOrderDetail(response.data)
     ? ensureOrderPlatformProfile(response.data)
     : normalizeBackendOrderDetail(response.data as RawOrderRecord);
+}
+
+export async function syncOrder(orderSn: string, shopId: string) {
+  return requestStrict<ERP.ApiResponse<{ jobId?: string; recordId?: string; status?: string }>>(
+    `/api/erp/orders/${orderSn}/sync`,
+    'POST',
+    { shopId },
+  );
+}
+
+export async function getOrderEscrow(orderSn: string, shopId: string) {
+  return requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
+    `/api/erp/orders/${orderSn}/escrow`,
+    'GET',
+    { shopId },
+  );
 }
 
 export async function queryAfterSales(params: ERP.OrderQueryParams) {
@@ -298,16 +317,9 @@ export async function queryOrderLogs(params: ERP.OrderLogQueryParams) {
 }
 
 export async function queryShopeeSyncLogs(params: ERP.ShopeeSyncLogQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<ERP.ShopeeSyncLogItem>>(
-    '/api/shopee/orders/sync/logs',
+  const response = await requestStrict<API.ListResponse<ERP.ShopeeSyncLogItem>>(
+    '/api/erp/sync-logs',
     'GET',
-    () => ({
-      success: true,
-      data: [],
-      total: 0,
-      current: params.current || 1,
-      pageSize: params.pageSize || 20,
-    }),
     params,
   );
   return normalizeListResponse(response);
@@ -333,13 +345,30 @@ export async function getOrderRuleDetail(id: string) {
 }
 
 export async function getOrderOverview(currentTab?: string) {
-  const response = await requestWithFallback<ERP.ApiResponse<ERP.OrderOverview>>(
-    '/api/orders/overview',
-    'GET',
-    () => ({ success: true, data: summarizeOrders(currentTab) }),
-    currentTab ? { currentTab } : undefined,
-  );
-  return response.data;
+  const response = await requestStrict<
+    ERP.ApiResponse<{
+      orderCount: number;
+      todayOrderCount: number;
+    }>
+  >('/api/erp/dashboard/summary', 'GET');
+
+  return {
+    ...summarizeOrders(currentTab),
+    total: response.data.orderCount,
+    pendingCount: response.data.todayOrderCount,
+  };
+}
+
+export async function queryDashboardSummary() {
+  return requestStrict<
+    ERP.ApiResponse<{
+      shopCount: number;
+      productCount: number;
+      orderCount: number;
+      todayOrderCount: number;
+      todaySalesAmount: string;
+    }>
+  >('/api/erp/dashboard/summary', 'GET');
 }
 
 export async function addInvoiceData(payload: ERP.OrderOperationPayload) {
@@ -539,10 +568,10 @@ export const manualSyncOrders = (payload: ERP.OrderOperationPayload) =>
     '已回退到本地 mock 同步',
   );
 export const syncOrderDetailNow = (payload: ERP.OrderOperationPayload) =>
-  postShopeeOrderSync<{ synced?: number; failed?: string[] }>(
-    '/api/shopee/orders/sync/detail',
-    payload,
-    '已回退到本地 mock 详情同步',
+  requestStrict<ERP.ApiResponse<{ jobId?: string; recordId?: string; status?: string }>>(
+    `/api/erp/orders/${payload.orderSn || payload.orderNo || payload.orderId}/sync`,
+    'POST',
+    { shopId: payload.shopId },
   );
 export const syncShippingDocumentResultNow = (payload: ERP.OrderOperationPayload) =>
   postShopeeOrderSync<{ synced?: number; failed?: string[] }>(

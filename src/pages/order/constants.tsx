@@ -1,7 +1,10 @@
 import { Tag } from 'antd';
 import React from 'react';
 
-export const ORDER_STATUS_OPTIONS: Record<ERP.OrderStatus, { text: string; color: string }> = {
+export const ORDER_STATUS_OPTIONS: Record<
+  ERP.OrderStatus,
+  { text: string; color: string }
+> = {
   UNPAID: { text: '未付款', color: 'default' },
   PENDING_INVOICE: { text: '待补发票', color: 'orange' },
   READY_TO_SHIP: { text: '待出货', color: 'gold' },
@@ -15,7 +18,10 @@ export const ORDER_STATUS_OPTIONS: Record<ERP.OrderStatus, { text: string; color
   TO_RETURN: { text: '退货退款中', color: 'magenta' },
 };
 
-export const PAY_STATUS_OPTIONS: Record<ERP.PayStatus, { text: string; color: string }> = {
+export const PAY_STATUS_OPTIONS: Record<
+  ERP.PayStatus,
+  { text: string; color: string }
+> = {
   UNPAID: { text: '未支付', color: 'default' },
   PAID: { text: '已支付', color: 'success' },
   PART_REFUNDED: { text: '部分退款', color: 'gold' },
@@ -30,7 +36,10 @@ export const SHOPEE_PLATFORM_STATUS_OPTIONS: Record<
   ...ORDER_STATUS_OPTIONS,
 };
 
-export const AUDIT_STATUS_OPTIONS: Record<ERP.AuditStatus, { text: string; color: string }> = {
+export const AUDIT_STATUS_OPTIONS: Record<
+  ERP.AuditStatus,
+  { text: string; color: string }
+> = {
   PENDING: { text: '待内部审核', color: 'gold' },
   APPROVED: { text: '内部已审核', color: 'success' },
   REJECTED: { text: '审核驳回', color: 'error' },
@@ -43,8 +52,8 @@ export const PACKAGE_STATUS_OPTIONS: Record<
   { text: string; color: string }
 > = {
   PENDING: { text: '包裹待生成', color: 'default' },
-  TO_PROCESS: { text: '待处理包裹', color: 'gold' },
-  PROCESSED: { text: '已处理包裹', color: 'processing' },
+  TO_PROCESS: { text: '待处理包装', color: 'gold' },
+  PROCESSED: { text: '已处理包装', color: 'processing' },
 };
 
 export const PACKAGE_FULFILLMENT_STATUS_OPTIONS: Record<
@@ -89,14 +98,20 @@ export const EXCEPTION_TAG_OPTIONS: Record<
   TIMEOUT: { text: '超时未处理', color: 'gold' },
 };
 
-export const RISK_LEVEL_OPTIONS: Record<ERP.RiskLevel, { text: string; color: string }> = {
+export const RISK_LEVEL_OPTIONS: Record<
+  ERP.RiskLevel,
+  { text: string; color: string }
+> = {
   LOW: { text: '低风险', color: 'default' },
   MEDIUM: { text: '中风险', color: 'gold' },
   HIGH: { text: '高风险', color: 'orange' },
   CRITICAL: { text: '严重', color: 'red' },
 };
 
-export const RULE_TYPE_OPTIONS: Record<ERP.RuleType, { text: string; color: string }> = {
+export const RULE_TYPE_OPTIONS: Record<
+  ERP.RuleType,
+  { text: string; color: string }
+> = {
   ADDRESS_VALIDATION: { text: '地址校验', color: 'red' },
   RISK_CONTROL: { text: '风控', color: 'volcano' },
   STOCK_ALLOCATION: { text: '库存/分仓', color: 'cyan' },
@@ -123,7 +138,7 @@ export const LOGISTICS_STATUS_OPTIONS: Record<
   LOGISTICS_NOT_START: { text: '物流未开始', color: 'default' },
   LOGISTICS_READY: { text: '物流参数已就绪', color: 'gold' },
   LOGISTICS_PENDING_ARRANGE: { text: '待安排发货', color: 'gold' },
-  LOGISTICS_REQUEST_CREATED: { text: '已安排发货请求', color: 'processing' },
+  LOGISTICS_REQUEST_CREATED: { text: '已创建发货请求', color: 'processing' },
   LOGISTICS_PICKUP_DONE: { text: '已揽收/已首扫', color: 'blue' },
   LOGISTICS_PICKUP_RETRY: { text: '待重新揽收', color: 'orange' },
   LOGISTICS_PICKUP_FAILED: { text: '揽收失败', color: 'error' },

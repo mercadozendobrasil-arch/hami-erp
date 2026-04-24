@@ -1,7 +1,7 @@
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
 import { history } from '@umijs/max';
-import { Button, Tag, message } from 'antd';
+import { Button, message, Tag } from 'antd';
 import React, { useRef } from 'react';
 import { queryShops, syncShopeeOrdersByShop } from '@/services/erp/shop';
 
@@ -78,8 +78,17 @@ const ShopListPage: React.FC = () => {
         >
           同步订单
         </a>,
-        <a key="view-orders" onClick={() => history.push(`/order/all?shopId=${record.shopId}`)}>
+        <a
+          key="view-orders"
+          onClick={() => history.push(`/order/all?shopId=${record.shopId}`)}
+        >
           查看订单
+        </a>,
+        <a
+          key="view-products"
+          onClick={() => history.push(`/product/list?shopId=${record.shopId}`)}
+        >
+          查看商品
         </a>,
       ],
     },

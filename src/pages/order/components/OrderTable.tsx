@@ -86,7 +86,13 @@ const OrderTable: React.FC<OrderTableProps> = ({
           copyable: true,
           fixed: 'left',
           render: (_, record) => (
-            <a onClick={() => history.push(`/order/detail/${record.id}`)}>
+            <a
+              onClick={() =>
+                history.push(
+                  `/order/detail/${record.id}?shopId=${record.platformShopId}`,
+                )
+              }
+            >
               {record.orderNo}
             </a>
           ),
@@ -123,7 +129,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
           ellipsis: true,
         },
         {
-          title: 'SKU数',
+          title: 'SKU 数',
           dataIndex: 'skuCount',
           width: 90,
           search: false,
@@ -161,7 +167,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
             renderStatusTag(record.packageStatus, PACKAGE_STATUS_OPTIONS),
         },
         {
-          title: '包裹履约状态',
+          title: '履约状态',
           dataIndex: 'packageFulfillmentStatus',
           width: 160,
           valueEnum: PACKAGE_FULFILLMENT_STATUS_VALUE_ENUM,
@@ -305,7 +311,11 @@ const OrderTable: React.FC<OrderTableProps> = ({
               <Button
                 type="link"
                 size="small"
-                onClick={() => history.push(`/order/detail/${record.id}`)}
+                onClick={() =>
+                  history.push(
+                    `/order/detail/${record.id}?shopId=${record.platformShopId}`,
+                  )
+                }
               >
                 详情
               </Button>
@@ -375,6 +385,10 @@ const OrderTable: React.FC<OrderTableProps> = ({
       ),
     );
   };
+
+  const selectedTargetLabel = selectedRows.length
+    ? `${selectedRows.length} 条订单`
+    : '当前筛选结果';
 
   return (
     <>
@@ -508,9 +522,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
                 <Button
                   key="export"
                   onClick={() =>
-                    messageApi.success(
-                      `已提交${selectedRows.length ? `${selectedRows.length}条订单` : '当前筛选结果'}导出任务`,
-                    )
+                    messageApi.success(`已提交 ${selectedTargetLabel} 导出任务`)
                   }
                 >
                   批量导出
@@ -518,9 +530,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
                 <Button
                   key="print"
                   onClick={() =>
-                    messageApi.success(
-                      `已提交${selectedRows.length ? `${selectedRows.length}条订单` : '当前筛选结果'}打印任务`,
-                    )
+                    messageApi.success(`已提交 ${selectedTargetLabel} 打印任务`)
                   }
                 >
                   批量打印
@@ -533,7 +543,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
         <FooterToolbar
           extra={
             <Typography.Text>
-              已选{' '}
+              已选择{' '}
               <Typography.Text strong>{selectedRows.length}</Typography.Text>{' '}
               条订单
             </Typography.Text>

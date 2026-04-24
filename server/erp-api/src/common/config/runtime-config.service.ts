@@ -26,6 +26,22 @@ export class RuntimeConfigService {
     return getRedisRuntimeConfig(this.configService);
   }
 
+  getMetabaseSiteUrl() {
+    return this.configService.get<string>('METABASE_SITE_URL');
+  }
+
+  getMetabaseEmbedSecret() {
+    return this.configService.get<string>('METABASE_EMBED_SECRET');
+  }
+
+  getMetabaseDefaultDashboardId() {
+    return this.configService.get<string>('METABASE_DEFAULT_DASHBOARD_ID');
+  }
+
+  isMetabaseEmbeddingEnabled() {
+    return Boolean(this.getMetabaseSiteUrl() && this.getMetabaseEmbedSecret());
+  }
+
   buildFrontendCallbackUrl(params: Record<string, string>) {
     const redirect = new URL('/shop/auth', this.getFrontendBaseUrl());
 

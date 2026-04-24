@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { RuntimeConfigModule } from './common/config/runtime-config.module';
 import { DatabaseModule } from './modules/database/prisma.module';
 import { HealthModule } from './modules/health/health.module';
+import { MetabaseModule } from './modules/metabase/metabase.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ShopeeModule } from './modules/shopee/shopee.module';
@@ -19,6 +20,7 @@ import { validateEnvironment } from './common/config/env.validation';
     RuntimeConfigModule,
     DatabaseModule,
     HealthModule,
+    MetabaseModule,
     ShopeeModule,
     ShopsModule,
     ProductsModule,

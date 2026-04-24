@@ -15,8 +15,11 @@ import {
   Space,
   Typography,
 } from 'antd';
-import React, { useMemo } from 'react';
-import { getShopeeAuthUrl } from '@/services/erp/shop';
+import React, { useEffect, useMemo } from 'react';
+import {
+  getShopeeAuthUrl,
+  submitShopeeAuthCallback,
+} from '@/services/erp/shop';
 
 const ShopAuthPage: React.FC = () => {
   const location = useLocation();
@@ -30,6 +33,26 @@ const ShopAuthPage: React.FC = () => {
       errorMessage: search.get('message'),
     };
   }, [location.search]);
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const code = search.get('code');
+    const shopId = search.get('shop_id') || search.get('shopId');
+
+    if (!code || !shopId || status === 'authorized') {
+      return;
+    }
+
+    submitShopeeAuthCallback({ code, shopId })
+      .then(() => {
+        messageApi.success('Shopee 店铺授权成功');
+        history.replace(`/shop/auth?status=authorized&shopId=${shopId}`);
+      })
+      .catch((error) => {
+        console.error(error);
+        messageApi.error('Shopee 店铺授权保存失败');
+      });
+  }, [location.search, messageApi, status]);
 
   const handleAuthorize = async () => {
     try {
@@ -63,7 +86,9 @@ const ShopAuthPage: React.FC = () => {
             type="error"
             showIcon
             message="授权失败"
-            description={errorMessage || 'Shopee 授权流程未完成，请重新发起授权。'}
+            description={
+              errorMessage || 'Shopee 授权流程未完成，请重新发起授权。'
+            }
           />
         )}
 
@@ -75,7 +100,8 @@ const ShopAuthPage: React.FC = () => {
                   前端只调用 ERP API 获取授权地址，然后跳转到 Shopee 授权页。
                 </Typography.Paragraph>
                 <Typography.Paragraph>
-                  partner key、access token、refresh token 和签名逻辑都只保留在后端。
+                  `partner key`、`access token`、`refresh token`
+                  和签名逻辑都只保留在后端。
                 </Typography.Paragraph>
                 <Space wrap>
                   <Button
