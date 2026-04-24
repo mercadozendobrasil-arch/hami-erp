@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  DISCONNECTED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model ShopeeShop {
+  id          String          @id @default(cuid())
+  shopId      BigInt          @unique
+  region      String?
+  shopName    String?
+  status      ShopStatus      @default(ACTIVE)
+  tokens      ShopeeToken[]
+  webhooks    WebhookEvent[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ShopeeToken {
+  id                    String      @id @default(cuid())
+  shop                  ShopeeShop  @relation(fields: [shopRef], references: [id], onDelete: Cascade)
+  shopRef               String
+  accessToken           String
+  refreshToken          String
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([shopRef])
+}
+
+model JobRecord {
+  id           String    @id @default(cuid())
+  queueName    String
+  jobName      String
+  status       JobStatus @default(PENDING)
+  payload      Json?
+  result       Json?
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([queueName, status])
+}
+
+model WebhookEvent {
+  id          String         @id @default(cuid())
+  shop        ShopeeShop?    @relation(fields: [shopRef], references: [id], onDelete: SetNull)
+  shopRef     String?
+  topic       String
+  eventId     String?        @unique
+  payload     Json
+  status      WebhookStatus  @default(PENDING)
+  processedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([shopRef, status])
+}
+
