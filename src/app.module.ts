@@ -4,7 +4,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CommonModule } from './common/common.module';
 import { PrismaModule } from './infra/database/prisma.module';
+import { QueueModule } from './infra/queue/queue.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ShopsModule } from './modules/shops/shops.module';
 
 @Module({
   imports: [
@@ -24,7 +28,11 @@ import { PrismaModule } from './infra/database/prisma.module';
         prefix: configService.get<string>('QUEUE_PREFIX', 'shopee-service'),
       }),
     }),
+    CommonModule,
     PrismaModule,
+    QueueModule,
+    AuthModule,
+    ShopsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
