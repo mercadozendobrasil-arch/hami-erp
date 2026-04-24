@@ -1,0 +1,7 @@
+{
+  "jobId": "job_publish_01",
+  "status": "QUEUED",
+  "shopId": 987654321,
+  "internalSku": "SKU-1001",
+  "message": "Product publish job accepted."
+}

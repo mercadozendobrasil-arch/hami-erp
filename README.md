@@ -1,96 +1,106 @@
 # shopee-service
 
-`shopee-service` 是一个基于 `Node.js + TypeScript + NestJS` 的 Shopee 集成服务项目骨架。当前阶段只完成基础工程初始化，不包含完整 Shopee 业务实现。
+`shopee-service` is a NestJS-based backend skeleton for integrating with Shopee Open Platform. The current commit provides infrastructure and persistence groundwork only: configuration loading, Prisma, BullMQ, Swagger, Docker, and a basic health endpoint.
 
-## 当前范围
+This branch focuses on developer-facing documentation so the next implementation phase can proceed with a shared understanding of flows, boundaries, and pending integration work.
 
-- NestJS 基础入口与健康检查
-- PostgreSQL + Prisma 基础接入结构
-- Redis + BullMQ 基础接入结构
-- Swagger 文档初始化
-- Docker / docker-compose 本地开发骨架
-- Prisma 基础模型占位
+## Current Scope
 
-## 技术栈
+- NestJS application bootstrap with global validation
+- Swagger UI bootstrap
+- PostgreSQL integration through Prisma
+- Redis/BullMQ bootstrap
+- Basic health check endpoint: `GET /api/health`
+- Initial Prisma models for shop auth, tokens, jobs, and webhook events
 
-- Node.js
-- TypeScript
-- NestJS
-- PostgreSQL
-- Redis
-- BullMQ
-- Prisma
-- Swagger
-- Docker
+## What Is Not Implemented Yet
 
-## 目录结构
+- Shopee shop authorization endpoints
+- Token exchange and token refresh jobs
+- Product publish APIs and payload mapping
+- Order pull/sync workers
+- Webhook ingestion and event routing
+- Production-ready observability, retries, and idempotency controls
 
-```text
-.
-|-- src
-|   |-- app.controller.ts
-|   |-- app.module.ts
-|   |-- app.service.ts
-|   `-- infra
-|       `-- database
-|-- prisma
-|   `-- schema.prisma
-|-- test
-|-- docker-compose.yml
-|-- Dockerfile
-`-- .env.example
+## Quick Start
+
+1. Install dependencies:
+
+```bash
+npm install
 ```
 
-## 环境变量
-
-复制环境变量模板并按需修改：
+2. Create the local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Windows PowerShell:
+PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-## 本地开发
+3. Generate the Prisma client:
 
 ```bash
-npm install
 npm run prisma:generate
+```
+
+4. Start the service:
+
+```bash
 npm run start:dev
 ```
 
-Swagger 默认地址：
-
-- `http://localhost:3000/docs`
-
-健康检查：
-
-- `GET /api/health`
-
-## Docker 开发
+5. Optional Docker-based startup:
 
 ```bash
 docker compose up --build
 ```
 
-## Prisma 基础模型说明
+## Runtime Endpoints
 
-当前只创建了项目初始骨架需要的基础模型：
+- API base prefix: `/${API_PREFIX}` with default `api`
+- Health check: `GET /api/health`
+- Swagger UI: `http://localhost:3000/${SWAGGER_PATH}` with default `docs`
 
-- `ShopeeShop`
-- `ShopeeToken`
-- `JobRecord`
-- `WebhookEvent`
+## Data Model Snapshot
 
-这些模型用于承接后续店铺授权、令牌生命周期、异步任务和 webhook 处理，但本阶段不实现完整业务逻辑。
+The current Prisma schema establishes the persistence shape for later Shopee integration work:
 
-## 下一步建议
+- `ShopeeShop`: authorized shop identity and status
+- `ShopeeToken`: access token and refresh token lifecycle
+- `JobRecord`: background job execution audit
+- `WebhookEvent`: raw webhook ingestion and processing status
 
-- 增加配置模块与环境变量校验
-- 补充 Prisma migration
-- 引入日志、异常过滤器和统一响应结构
-- 按业务边界逐步创建 Shopee 授权、商品、订单、物流等模块
+## Documentation
+
+- [Authorization Flow](./docs/auth-flow.md)
+- [Product Publish Flow](./docs/product-publish-flow.md)
+- [Order Sync Flow](./docs/order-sync-flow.md)
+- [Webhook Configuration](./docs/webhook.md)
+- [Environment Variables](./docs/env.md)
+- [API Examples](./docs/api-examples.md)
+- [Integration TODO](./docs/integration-todo.md)
+
+Supporting assets:
+
+- [OpenAPI Scaffold](./openapi/README.md)
+- [Example Payloads](./examples/README.md)
+
+## Suggested Next Build Order
+
+1. Add a Shopee configuration module with env validation.
+2. Implement auth URL generation, callback handling, and token exchange.
+3. Add token refresh scheduling and token persistence rules.
+4. Build product publishing services after auth is stable.
+5. Add order sync jobs and webhook ingestion with idempotency.
+
+## Notes For Contributors
+
+- Treat sandbox and production Shopee credentials as separate environments.
+- Preserve raw Shopee request/response data around signing and webhook ingestion boundaries.
+- Do not expose `partner_key` or refresh tokens to frontend clients.
+- Keep documents in `docs/`, examples in `examples/`, and machine-readable specs in `openapi/`.

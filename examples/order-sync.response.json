@@ -1,0 +1,6 @@
+{
+  "jobId": "job_order_sync_01",
+  "status": "QUEUED",
+  "shopId": 987654321,
+  "mode": "incremental"
+}

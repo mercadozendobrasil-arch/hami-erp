@@ -1,0 +1,6 @@
+{
+  "shopId": 987654321,
+  "mode": "incremental",
+  "updatedAfter": "2026-04-24T00:00:00.000Z",
+  "updatedBefore": "2026-04-24T23:59:59.999Z"
+}

@@ -1,0 +1,5 @@
+{
+  "shopHint": "optional-human-readable-label",
+  "region": "BR",
+  "redirectState": "internal-correlation-id-123"
+}
