@@ -11,8 +11,11 @@ import { QueueModule } from './infra/queue/queue.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { LogisticsModule } from './modules/logistics/logistics.module';
 import { MediaModule } from './modules/media/media.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ShopsModule } from './modules/shops/shops.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -41,6 +44,9 @@ import { ShopsModule } from './modules/shops/shops.module';
     ProductsModule,
     MediaModule,
     LogisticsModule,
+    PaymentsModule,
+    OrdersModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
