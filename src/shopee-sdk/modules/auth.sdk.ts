@@ -1,7 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
-import { SHOPEE_DEFAULT_API_BASE_URL } from 'src/common/shopee.constants';
+import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
 import {
   createShopeeApiSignature,
   createShopeeAuthUrlSignature,
@@ -15,7 +14,9 @@ interface GetAccessTokenParams {
 
 @Injectable()
 export class AuthSdk {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
+  ) {}
 
   generateAuthorizationUrl(redirect: string) {
     const timestamp = this.getTimestamp();
@@ -94,18 +95,15 @@ export class AuthSdk {
   }
 
   private getApiBaseUrl() {
-    return this.configService.get<string>(
-      'SHOPEE_API_BASE_URL',
-      SHOPEE_DEFAULT_API_BASE_URL,
-    );
+    return this.shopeeEnvironmentResolver.getCurrentConfig().baseUrl;
   }
 
   private getPartnerId() {
-    return Number(this.configService.getOrThrow<string>('SHOPEE_PARTNER_ID'));
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerId;
   }
 
   private getPartnerKey() {
-    return this.configService.getOrThrow<string>('SHOPEE_PARTNER_KEY');
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerKey;
   }
 
   private getTimestamp() {

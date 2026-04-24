@@ -4,7 +4,7 @@ import { IsOptional, IsUrl } from 'class-validator';
 export class CreateAuthorizeUrlDto {
   @ApiPropertyOptional({
     description:
-      'Optional redirect URI override. Falls back to SHOPEE_REDIRECT_URI.',
+      'Optional redirect URI override. Falls back to the active Shopee environment redirect URL.',
   })
   @IsOptional()
   @IsUrl({

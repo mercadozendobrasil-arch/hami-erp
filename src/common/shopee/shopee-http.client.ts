@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { ShopeeEnvironmentResolver } from '../shopee-environment.resolver';
 import { SHOPEE_API_DEFAULT_VERSION } from '../constants/shopee.constants';
 import { compactObject } from '../utils/object.util';
 import { ShopeeApiEnvelope, ShopeeRequestOptions } from './shopee.types';
@@ -16,16 +17,17 @@ import { ShopeeApiEnvelope, ShopeeRequestOptions } from './shopee.types';
 export class ShopeeHttpClient {
   private readonly logger = new Logger(ShopeeHttpClient.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
+  ) {}
 
   async request<TResponse, TBody = unknown>(
     options: ShopeeRequestOptions<TBody>,
   ): Promise<TResponse> {
     const timestamp = Math.floor(Date.now() / 1000);
-    const host = this.configService.get<string>(
-      'SHOPEE_API_BASE_URL',
-      'https://partner.shopeemobile.com',
-    );
+    const shopeeConfig = this.shopeeEnvironmentResolver.getCurrentConfig();
+    const host = shopeeConfig.baseUrl;
     const version = this.configService.get<string>(
       'SHOPEE_API_VERSION',
       SHOPEE_API_DEFAULT_VERSION,
@@ -35,8 +37,8 @@ export class ShopeeHttpClient {
       : `/api/${version}${options.path.startsWith('/') ? options.path : `/${options.path}`}`;
     const url = new URL(`${host}${normalizedPath}`);
 
-    const partnerId = this.configService.get<string>('SHOPEE_PARTNER_ID');
-    const partnerKey = this.configService.get<string>('SHOPEE_PARTNER_KEY');
+    const partnerId = String(shopeeConfig.partnerId);
+    const partnerKey = shopeeConfig.partnerKey;
 
     if (!partnerId || !partnerKey) {
       throw new InternalServerErrorException(

@@ -100,7 +100,8 @@ Supporting assets:
 
 ## Notes For Contributors
 
-- Treat sandbox and production Shopee credentials as separate environments.
+- Set `SHOPEE_ENV` to either `sandbox` or `production` and keep both credential sets configured separately.
+- All Shopee SDK traffic must resolve `baseUrl`, `partnerId`, `partnerKey`, and `redirectUrl` from the active environment config.
 - Preserve raw Shopee request/response data around signing and webhook ingestion boundaries.
 - Do not expose `partner_key` or refresh tokens to frontend clients.
 - Keep documents in `docs/`, examples in `examples/`, and machine-readable specs in `openapi/`.

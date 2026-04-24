@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
+import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
 import { SHOPEE_REFRESH_TOKEN_TTL_SECONDS } from 'src/common/shopee.constants';
 import { ShopeeTokenService } from 'src/common/shopee-token.service';
 import { ShopSdk } from 'src/shopee-sdk/modules/shop.sdk';
@@ -12,7 +12,7 @@ import { AuthCallbackDto } from './dto/auth-callback.dto';
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly configService: ConfigService,
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
     private readonly authSdk: AuthSdk,
     private readonly shopSdk: ShopSdk,
     private readonly tokenService: ShopeeTokenService,
@@ -22,7 +22,7 @@ export class AuthService {
   createAuthorizeUrl(redirectUri?: string) {
     const finalRedirectUri =
       redirectUri ??
-      this.configService.getOrThrow<string>('SHOPEE_REDIRECT_URI');
+      this.shopeeEnvironmentResolver.getCurrentConfig().redirectUrl;
     const payload = this.authSdk.generateAuthorizationUrl(finalRedirectUri);
 
     return {

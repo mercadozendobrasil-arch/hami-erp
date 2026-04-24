@@ -1,6 +1,6 @@
 # Environment Variables
 
-This document explains the environment variables currently used by the repository and the Shopee-specific variables that should be added on the main branch.
+This document explains the runtime variables used by the repository, with special focus on the active Shopee environment selection.
 
 ## Current Variables In `.env.example`
 
@@ -28,21 +28,29 @@ This document explains the environment variables currently used by the repositor
 - `REDIS_DB`: Redis database index
 - `QUEUE_PREFIX`: BullMQ key prefix
 
-## Recommended Shopee Variables To Add
+## Shopee Variables
 
-These are not present in `.env.example` yet, but they will be required when the Shopee modules are integrated.
+### Active Environment
 
-### Partner Credentials
+- `SHOPEE_ENV`: must be `sandbox` or `production`
 
-- `SHOPEE_PARTNER_ID`
-- `SHOPEE_PARTNER_KEY`
-- `SHOPEE_BASE_URL`
-- `SHOPEE_WEBHOOK_BASE_URL`
+### Sandbox Configuration
 
-### Auth / Callback
+- `SHOPEE_SANDBOX_BASE_URL`
+- `SHOPEE_SANDBOX_PARTNER_ID`
+- `SHOPEE_SANDBOX_PARTNER_KEY`
+- `SHOPEE_SANDBOX_REDIRECT_URL`
 
-- `SHOPEE_AUTH_CALLBACK_URL`
-- `SHOPEE_USE_SANDBOX`
+### Production Configuration
+
+- `SHOPEE_PROD_BASE_URL`
+- `SHOPEE_PROD_PARTNER_ID`
+- `SHOPEE_PROD_PARTNER_KEY`
+- `SHOPEE_PROD_REDIRECT_URL`
+
+### Shared Shopee Runtime
+
+- `SHOPEE_WEBHOOK_SECRET`
 
 ### Operations
 
@@ -56,18 +64,23 @@ These are not present in `.env.example` yet, but they will be required when the 
 - validate all required variables at startup
 - keep sandbox and production configs clearly separated
 - do not infer production from missing env vars
+- route all SDK requests through a single environment resolver
 - never log secrets in plain text
 - load callback and public base URLs from config, not hardcoded values
 
-## Example Future `.env` Block
+## Example `.env` Block
 
 ```dotenv
-SHOPEE_USE_SANDBOX=true
-SHOPEE_PARTNER_ID=123456
-SHOPEE_PARTNER_KEY=replace-me
-SHOPEE_BASE_URL=https://partner.uat.shopeemobile.com
-SHOPEE_AUTH_CALLBACK_URL=https://example.com/api/shopee/auth/callback
-SHOPEE_WEBHOOK_BASE_URL=https://example.com/api/shopee/webhooks
+SHOPEE_ENV=sandbox
+SHOPEE_SANDBOX_BASE_URL=https://partner.test-stable.shopeemobile.com
+SHOPEE_SANDBOX_PARTNER_ID=123456
+SHOPEE_SANDBOX_PARTNER_KEY=replace-me
+SHOPEE_SANDBOX_REDIRECT_URL=https://sandbox.example.com/api/auth/callback
+SHOPEE_PROD_BASE_URL=https://partner.shopeemobile.com
+SHOPEE_PROD_PARTNER_ID=654321
+SHOPEE_PROD_PARTNER_KEY=replace-me-too
+SHOPEE_PROD_REDIRECT_URL=https://example.com/api/auth/callback
+SHOPEE_WEBHOOK_SECRET=optional-webhook-secret
 SHOPEE_TOKEN_REFRESH_CRON=*/30 * * * *
 SHOPEE_ORDER_SYNC_CRON=*/10 * * * *
 SHOPEE_HTTP_TIMEOUT_MS=10000
@@ -77,6 +90,6 @@ SHOPEE_HTTP_MAX_RETRIES=3
 ## Main-Branch Integration TODO Summary
 
 - add env schema validation
-- split Shopee config from generic app config
-- add explicit sandbox/production config object
+- keep Shopee config separate from generic app config
+- keep the explicit sandbox/production config object
 - redact secrets in logs and error reports

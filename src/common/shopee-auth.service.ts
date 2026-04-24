@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from 'src/infra/database/prisma.service';
 
-import { DEFAULT_SHOPEE_BASE_URL } from './shopee.constants';
+import { ShopeeEnvironmentResolver } from './shopee-environment.resolver';
 
 interface ShopeeShopCredentials {
   internalShopRef: string;
@@ -19,31 +19,16 @@ interface ShopeeShopCredentials {
 export class ShopeeAuthService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
     private readonly prismaService: PrismaService,
   ) {}
 
   getPartnerId(): number {
-    const partnerId = this.configService.get<string>('SHOPEE_PARTNER_ID');
-
-    if (!partnerId) {
-      throw new UnauthorizedException(
-        'Missing SHOPEE_PARTNER_ID configuration.',
-      );
-    }
-
-    return Number(partnerId);
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerId;
   }
 
   getPartnerKey(): string {
-    const partnerKey = this.configService.get<string>('SHOPEE_PARTNER_KEY');
-
-    if (!partnerKey) {
-      throw new UnauthorizedException(
-        'Missing SHOPEE_PARTNER_KEY configuration.',
-      );
-    }
-
-    return partnerKey;
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerKey;
   }
 
   getWebhookSecret(): string {
@@ -54,10 +39,7 @@ export class ShopeeAuthService {
   }
 
   getBaseUrl(): string {
-    return (
-      this.configService.get<string>('SHOPEE_BASE_URL') ??
-      DEFAULT_SHOPEE_BASE_URL
-    );
+    return this.shopeeEnvironmentResolver.getCurrentConfig().baseUrl;
   }
 
   async getShopCredentials(shopId: string): Promise<ShopeeShopCredentials> {

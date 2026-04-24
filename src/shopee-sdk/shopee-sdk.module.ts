@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
+import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
+
 import { ShopeeClient } from './shopee-client';
 import { ShopeeErrorMapper } from './shopee-error.mapper';
 import { ShopeeHttpService } from './shopee-http.service';
@@ -23,34 +25,41 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
   providers: [
     {
       provide: SHOPEE_SDK_OPTIONS,
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService): ShopeeSdkConfig => ({
-        baseUrl: configService.get<string>(
-          'SHOPEE_BASE_URL',
-          'https://partner.shopeemobile.com',
-        ),
-        partnerId: Number(configService.get<string>('SHOPEE_PARTNER_ID', '0')),
-        partnerKey: configService.get<string>('SHOPEE_PARTNER_KEY', ''),
-        timeoutMs: Number(
-          configService.get<string>('SHOPEE_TIMEOUT_MS', '10000'),
-        ),
-        retry: {
-          maxAttempts: Number(
-            configService.get<string>('SHOPEE_RETRY_MAX_ATTEMPTS', '3'),
+      inject: [ConfigService, ShopeeEnvironmentResolver],
+      useFactory: (
+        configService: ConfigService,
+        shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
+      ): ShopeeSdkConfig => {
+        const shopeeConfig = shopeeEnvironmentResolver.getCurrentConfig();
+
+        return {
+          baseUrl: shopeeConfig.baseUrl,
+          partnerId: shopeeConfig.partnerId,
+          partnerKey: shopeeConfig.partnerKey,
+          timeoutMs: Number(
+            configService.get<string>('SHOPEE_TIMEOUT_MS', '10000'),
           ),
-          baseDelayMs: Number(
-            configService.get<string>('SHOPEE_RETRY_BASE_DELAY_MS', '300'),
-          ),
-          maxDelayMs: Number(
-            configService.get<string>('SHOPEE_RETRY_MAX_DELAY_MS', '2000'),
-          ),
-        },
-        rateLimit: {
-          minIntervalMs: Number(
-            configService.get<string>('SHOPEE_RATE_LIMIT_MIN_INTERVAL_MS', '0'),
-          ),
-        },
-      }),
+          retry: {
+            maxAttempts: Number(
+              configService.get<string>('SHOPEE_RETRY_MAX_ATTEMPTS', '3'),
+            ),
+            baseDelayMs: Number(
+              configService.get<string>('SHOPEE_RETRY_BASE_DELAY_MS', '300'),
+            ),
+            maxDelayMs: Number(
+              configService.get<string>('SHOPEE_RETRY_MAX_DELAY_MS', '2000'),
+            ),
+          },
+          rateLimit: {
+            minIntervalMs: Number(
+              configService.get<string>(
+                'SHOPEE_RATE_LIMIT_MIN_INTERVAL_MS',
+                '0',
+              ),
+            ),
+          },
+        };
+      },
     },
     {
       provide: SHOPEE_API_LOGGER,

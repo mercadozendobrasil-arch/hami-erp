@@ -1,7 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
-import { SHOPEE_DEFAULT_API_BASE_URL } from 'src/common/shopee.constants';
+import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
 import { createShopeeApiSignature } from 'src/common/shopee-signature.util';
 import {
   ShopeeApiResponse,
@@ -16,7 +15,9 @@ interface ShopRequestParams {
 
 @Injectable()
 export class ShopSdk {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
+  ) {}
 
   async getShopInfo(params: ShopRequestParams) {
     return this.getSigned<ShopeeShopInfo>('/api/v2/shop/get_shop_info', params);
@@ -66,17 +67,14 @@ export class ShopSdk {
   }
 
   private getApiBaseUrl() {
-    return this.configService.get<string>(
-      'SHOPEE_API_BASE_URL',
-      SHOPEE_DEFAULT_API_BASE_URL,
-    );
+    return this.shopeeEnvironmentResolver.getCurrentConfig().baseUrl;
   }
 
   private getPartnerId() {
-    return Number(this.configService.getOrThrow<string>('SHOPEE_PARTNER_ID'));
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerId;
   }
 
   private getPartnerKey() {
-    return this.configService.getOrThrow<string>('SHOPEE_PARTNER_KEY');
+    return this.shopeeEnvironmentResolver.getCurrentConfig().partnerKey;
   }
 }
