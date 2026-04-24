@@ -5,6 +5,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './infra/database/prisma.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -25,6 +28,9 @@ import { PrismaModule } from './infra/database/prisma.module';
       }),
     }),
     PrismaModule,
+    PaymentsModule,
+    OrdersModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
