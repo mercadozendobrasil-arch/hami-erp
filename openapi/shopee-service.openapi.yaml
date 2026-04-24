@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: shopee-service
+  version: 0.1.0
+  description: >
+    Infrastructure skeleton for a Shopee integration service. At this commit,
+    only the health endpoint is implemented. Business endpoints described in
+    docs are planned, not live.
+servers:
+  - url: http://localhost:3000/api
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      tags:
+        - system
+      responses:
+        '200':
+          description: Basic service health response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+components: {}

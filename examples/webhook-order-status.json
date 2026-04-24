@@ -1,0 +1,9 @@
+{
+  "topic": "order_status_push",
+  "shop_id": 987654321,
+  "data": {
+    "ordersn": "240424ABC123",
+    "order_status": "READY_TO_SHIP",
+    "update_time": 1777027200
+  }
+}

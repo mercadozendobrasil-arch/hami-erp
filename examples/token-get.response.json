@@ -1,0 +1,8 @@
+{
+  "shopId": 987654321,
+  "accessToken": "access-token",
+  "refreshToken": "refresh-token",
+  "accessTokenExpiresAt": "2026-04-24T12:00:00.000Z",
+  "refreshTokenExpiresAt": "2026-05-24T08:00:00.000Z",
+  "status": "ACTIVE"
+}
