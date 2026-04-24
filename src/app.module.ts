@@ -4,7 +4,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ShopeeCommonModule } from './common/shopee/shopee-common.module';
 import { PrismaModule } from './infra/database/prisma.module';
+import { LogisticsModule } from './modules/logistics/logistics.module';
+import { MediaModule } from './modules/media/media.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -25,6 +29,10 @@ import { PrismaModule } from './infra/database/prisma.module';
       }),
     }),
     PrismaModule,
+    ShopeeCommonModule,
+    ProductsModule,
+    MediaModule,
+    LogisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
