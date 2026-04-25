@@ -22,6 +22,52 @@ export class ShopeeApiClientService {
   async request<TResponse>(
     options: ShopeeRequestOptions,
   ): Promise<ShopeeApiEnvelope<TResponse>> {
+    const response = await this.execute(options, 'application/json');
+    const payload = (await response.json()) as ShopeeApiEnvelope<TResponse>;
+
+    if (!response.ok || payload.error) {
+      throw new BadGatewayException({
+        message:
+          payload.message ?? payload.error ?? 'Shopee API request failed.',
+        requestId: payload.request_id,
+        path: options.path,
+      });
+    }
+
+    return payload;
+  }
+
+  async download(options: ShopeeRequestOptions): Promise<Buffer> {
+    const response = await this.execute(options, 'application/pdf,application/octet-stream,application/json');
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      throw new BadGatewayException({
+        message: 'Shopee file download failed.',
+        path: options.path,
+        status: response.status,
+      });
+    }
+
+    if (contentType.includes('application/json')) {
+      const payload = (await response.json()) as ShopeeApiEnvelope<Record<string, unknown>>;
+      if (payload.error) {
+        throw new BadGatewayException({
+          message: payload.message ?? payload.error ?? 'Shopee file download failed.',
+          requestId: payload.request_id,
+          path: options.path,
+        });
+      }
+      return Buffer.from(JSON.stringify(payload));
+    }
+
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  private async execute(
+    options: ShopeeRequestOptions,
+    accept: string,
+  ): Promise<Response> {
     const partnerId = this.shopeeAuthService.getPartnerId();
     const partnerKey = this.shopeeAuthService.getPartnerKey();
     const credentials = await this.shopeeAuthService.getShopCredentials(
@@ -47,30 +93,17 @@ export class ShopeeApiClientService {
     });
 
     const url = `${this.shopeeAuthService.getBaseUrl()}${options.path}?${query.toString()}`;
-    const response = await fetch(url, {
+    return fetch(url, {
       method: options.method,
       headers: {
-        Accept: 'application/json',
+        Accept: accept,
         'Content-Type': 'application/json',
       },
       body:
         options.method === 'POST' && options.body
-          ? JSON.stringify(this.removeUndefined(options.body))
+          ? JSON.stringify(this.removeUndefinedDeep(options.body))
           : undefined,
     });
-
-    const payload = (await response.json()) as ShopeeApiEnvelope<TResponse>;
-
-    if (!response.ok || payload.error) {
-      throw new BadGatewayException({
-        message:
-          payload.message ?? payload.error ?? 'Shopee API request failed.',
-        requestId: payload.request_id,
-        path: options.path,
-      });
-    }
-
-    return payload;
   }
 
   private toSearchParams(input: Record<string, unknown>): URLSearchParams {
@@ -92,5 +125,21 @@ export class ShopeeApiClientService {
     return Object.fromEntries(
       Object.entries(input).filter(([, value]) => value !== undefined),
     ) as T;
+  }
+
+  private removeUndefinedDeep(input: unknown): unknown {
+    if (Array.isArray(input)) {
+      return input.map((item) => this.removeUndefinedDeep(item));
+    }
+
+    if (input && typeof input === 'object') {
+      return Object.fromEntries(
+        Object.entries(input as Record<string, unknown>)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => [key, this.removeUndefinedDeep(value)]),
+      );
+    }
+
+    return input;
   }
 }
