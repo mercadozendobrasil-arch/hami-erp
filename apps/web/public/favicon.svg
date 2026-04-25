@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="HAMI favicon">
+  <rect width="128" height="128" rx="24" fill="#fff"/>
+  <g fill="#000" stroke="#000" stroke-linejoin="round" stroke-linecap="round">
+    <circle cx="64" cy="64" r="48" fill="none" stroke-width="8"/>
+    <path d="M27 94 L43 34 H60 L51 61 H75 L84 34 H101 L82 98 H65 L74 69 H50 L42 98 H25 Z"/>
+    <path d="M58 98 L82 34 H99 L121 98 H104 L99 84 H76 L71 98 Z M80 70 H96 L88 47 Z"/>
+    <circle cx="88" cy="26" r="8"/>
+  </g>
+</svg>
