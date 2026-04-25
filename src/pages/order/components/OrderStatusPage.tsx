@@ -2,6 +2,10 @@ import { Alert } from 'antd';
 import { PageContainer } from '@ant-design/pro-components';
 import React from 'react';
 import { queryOrders } from '@/services/erp/order';
+import {
+  queryLiveOrders,
+  LiveFulfillmentStage,
+} from '@/services/erp/orderLive';
 import OrderOverviewCards from './OrderOverviewCards';
 import OrderTable from './OrderTable';
 
@@ -13,6 +17,16 @@ type OrderStatusPageProps = {
   alertType?: 'info' | 'warning' | 'success';
   alertMessage?: string;
   alertDescription?: string;
+  shopId?: string;
+  live?: boolean;
+};
+
+const TAB_TO_FULFILLMENT_STAGE: Record<string, LiveFulfillmentStage | undefined> = {
+  pendingInvoice: 'pending_invoice',
+  pendingShipment: 'pending_shipment',
+  pendingPrint: 'pending_print',
+  pendingPickup: 'pending_pickup',
+  shipped: 'shipped',
 };
 
 const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
@@ -23,6 +37,8 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   alertType = 'info',
   alertMessage,
   alertDescription,
+  shopId,
+  live = true,
 }) => {
   const overviewItemsMap: Record<string, Array<{ key: keyof ERP.OrderOverview; title: string }>> = {
     pending: [
@@ -30,6 +46,21 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
       { key: 'unpaidCount', title: '未付款' },
       { key: 'pendingInvoiceCount', title: '待补发票' },
       { key: 'readyToShipCount', title: '待出货' },
+    ],
+    pendingInvoice: [
+      { key: 'pendingInvoiceCount', title: '待开票' },
+      { key: 'readyToShipCount', title: '可出货' },
+      { key: 'printPendingCount', title: '待面单' },
+    ],
+    pendingPrint: [
+      { key: 'printPendingCount', title: '待打印面单' },
+      { key: 'readyToShipCount', title: '待出货' },
+      { key: 'logisticsPendingCount', title: '待揽收' },
+    ],
+    pendingPickup: [
+      { key: 'logisticsPendingCount', title: '待揽收' },
+      { key: 'processedCount', title: '已安排出货' },
+      { key: 'shippedCount', title: '已发货' },
     ],
     pendingAudit: [
       { key: 'readyToShipCount', title: '待内部审核' },
@@ -54,10 +85,21 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
     ],
   };
 
+  const fulfillmentStage = TAB_TO_FULFILLMENT_STAGE[currentTab];
+  const request = live
+    ? (params: ERP.OrderQueryParams) =>
+        queryLiveOrders({ ...params, shopId, fulfillmentStage })
+    : queryOrders;
+
   return (
     <PageContainer title={title} subTitle={subTitle}>
       {overviewItemsMap[currentTab]?.length ? (
-        <OrderOverviewCards currentTab={currentTab} items={overviewItemsMap[currentTab]} />
+        <OrderOverviewCards
+          currentTab={currentTab}
+          shopId={shopId}
+          live={live}
+          items={overviewItemsMap[currentTab]}
+        />
       ) : null}
       {alertMessage ? (
         <Alert
@@ -68,7 +110,7 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
           description={alertDescription}
         />
       ) : null}
-      <OrderTable request={queryOrders} headerTitle={headerTitle} currentTab={currentTab} />
+      <OrderTable request={request} headerTitle={headerTitle} currentTab={currentTab} />
     </PageContainer>
   );
 };
