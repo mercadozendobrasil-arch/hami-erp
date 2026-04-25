@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  DISCONNECTED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum ErpLabelStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  DOWNLOADED
+}
+
+model ShopeeShop {
+  id          String          @id @default(cuid())
+  shopId      BigInt          @unique
+  region      String?
+  shopName    String?
+  status      ShopStatus      @default(ACTIVE)
+  tokens      ShopeeToken[]
+  webhooks    WebhookEvent[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ShopeeToken {
+  id                    String      @id @default(cuid())
+  shop                  ShopeeShop  @relation(fields: [shopRef], references: [id], onDelete: Cascade)
+  shopRef               String
+  accessToken           String
+  refreshToken          String
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([shopRef])
+}
+
+model JobRecord {
+  id           String    @id @default(cuid())
+  queueName    String
+  jobName      String
+  status       JobStatus @default(PENDING)
+  payload      Json?
+  result       Json?
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([queueName, status])
+  @@index([jobName, status])
+  @@index([createdAt])
+}
+
+model ErpOrderProjection {
+  id                     String    @id @default(cuid())
+  shopId                 String
+  orderSn                String
+  orderStatus            String
+  fulfillmentStage       String
+  packageNumber          String?
+  packageStatus          String?
+  logisticsStatus        String?
+  shippingCarrier        String?
+  shippingDocumentStatus String?
+  shippingDocumentType   String?
+  invoiceStatus          String?
+  buyerUsername          String?
+  totalAmount            Decimal?  @db.Decimal(18, 2)
+  currency               String?
+  createTime             DateTime?
+  updateTime             DateTime?
+  raw                    Json?
+  lastSyncedAt           DateTime  @default(now())
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([shopId, orderSn])
+  @@index([shopId, fulfillmentStage])
+  @@index([shopId, orderStatus])
+  @@index([shopId, shippingDocumentStatus])
+  @@index([updateTime])
+}
+
+model ErpShippingLabelRecord {
+  id                   String         @id @default(cuid())
+  shopId               String
+  orderSn              String
+  packageNumber        String?
+  shippingDocumentType String?
+  status               ErpLabelStatus @default(PENDING)
+  jobRecordId          String?
+  result               Json?
+  errorMessage         String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  downloadedAt         DateTime?
+
+  @@index([shopId, orderSn])
+  @@index([status])
+  @@index([jobRecordId])
+}
+
+model WebhookEvent {
+  id          String         @id @default(cuid())
+  shop        ShopeeShop?    @relation(fields: [shopRef], references: [id], onDelete: SetNull)
+  shopRef     String?
+  topic       String
+  eventId     String?        @unique
+  payload     Json
+  status      WebhookStatus  @default(PENDING)
+  processedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([shopRef, status])
+}
