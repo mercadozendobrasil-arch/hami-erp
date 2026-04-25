@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
 import { ShopeeCommonModule } from './common/shopee/shopee-common.module';
+import { ErpModule } from './erp/erp.module';
 import { PrismaModule } from './infra/database/prisma.module';
 import { QueueModule } from './infra/queue/queue.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -46,6 +47,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     LogisticsModule,
     PaymentsModule,
     OrdersModule,
+    ErpModule,
     WebhooksModule,
   ],
   controllers: [AppController],
