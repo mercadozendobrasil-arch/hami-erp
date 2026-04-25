@@ -2,9 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, Col, Row, Skeleton, Statistic } from 'antd';
 import React from 'react';
 import { getOrderOverview } from '@/services/erp/order';
+import { queryLiveOrderStatusCounts } from '@/services/erp/orderLive';
 
 type OrderOverviewCardsProps = {
   currentTab?: string;
+  shopId?: string;
+  live?: boolean;
   items: Array<{
     key: keyof ERP.OrderOverview;
     title: string;
@@ -12,10 +15,40 @@ type OrderOverviewCardsProps = {
   }>;
 };
 
-const OrderOverviewCards: React.FC<OrderOverviewCardsProps> = ({ currentTab, items }) => {
+function normalizeLiveOverview(
+  counts?: Awaited<ReturnType<typeof queryLiveOrderStatusCounts>>['data'],
+): Partial<ERP.OrderOverview> {
+  return {
+    total: counts?.total ?? 0,
+    pendingCount:
+      (counts?.pendingInvoice ?? 0) +
+      (counts?.pendingShipment ?? 0) +
+      (counts?.pendingPrint ?? 0) +
+      (counts?.pendingPickup ?? 0),
+    pendingInvoiceCount: counts?.pendingInvoice ?? 0,
+    readyToShipCount: counts?.pendingShipment ?? 0,
+    printPendingCount: counts?.pendingPrint ?? 0,
+    logisticsPendingCount: counts?.pendingPickup ?? 0,
+    processedCount: counts?.pendingPickup ?? 0,
+    shippedCount: counts?.shipped ?? 0,
+  };
+}
+
+const OrderOverviewCards: React.FC<OrderOverviewCardsProps> = ({
+  currentTab,
+  shopId,
+  live = false,
+  items,
+}) => {
   const { data, isLoading } = useQuery({
-    queryKey: ['order-overview', currentTab],
-    queryFn: () => getOrderOverview(currentTab),
+    queryKey: ['order-overview', currentTab, shopId, live],
+    queryFn: async () => {
+      if (!live) {
+        return getOrderOverview(currentTab);
+      }
+      const response = await queryLiveOrderStatusCounts({ shopId });
+      return normalizeLiveOverview(response.data);
+    },
   });
 
   return (
