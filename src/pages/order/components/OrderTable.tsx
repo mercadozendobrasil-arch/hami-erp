@@ -6,6 +6,10 @@ import type { SortOrder } from 'antd/es/table/interface';
 import dayjs from 'dayjs';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  createLivePrintLabelTask,
+  batchMarkLiveOrdersReadyForPickup,
+} from '@/services/erp/orderLive';
+import {
   AFTER_SALE_STATUS_OPTIONS,
   AFTER_SALE_STATUS_VALUE_ENUM,
   AUDIT_STATUS_OPTIONS,
@@ -65,6 +69,11 @@ function buildDefaultColumnState(columns: ProColumns<ERP.OrderListItem>[]) {
   }, {});
 }
 
+function resolveSingleShopId(rows: ERP.OrderListItem[]) {
+  const shopIds = Array.from(new Set(rows.map((row) => row.platformShopId).filter(Boolean)));
+  return shopIds.length === 1 ? shopIds[0] : undefined;
+}
+
 const OrderTable: React.FC<OrderTableProps> = ({
   request,
   headerTitle,
@@ -75,6 +84,75 @@ const OrderTable: React.FC<OrderTableProps> = ({
   const actionRef = useRef<ActionType | null>(null);
   const [selectedRows, setSelectedRows] = useState<ERP.OrderListItem[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
+
+  const handleBatchPrint = async () => {
+    if (!selectedRows.length) {
+      messageApi.warning('请先选择订单');
+      return;
+    }
+
+    const shopId = resolveSingleShopId(selectedRows);
+    if (!shopId) {
+      messageApi.error('批量打印暂只支持同一店铺订单');
+      return;
+    }
+
+    const hide = messageApi.loading('正在创建面单任务...', 0);
+    try {
+      const response = await createLivePrintLabelTask({
+        shopId,
+        orders: selectedRows.map((row) => ({
+          orderSn: row.orderSn,
+          packageNumber: row.packageNumber,
+          shippingDocumentType: row.packageList?.[0]?.shippingDocumentType,
+        })),
+      });
+      hide();
+      messageApi.success(
+        `面单任务已创建：${response.data.labelIds.length} 个面单，Job ${response.data.jobId}`,
+      );
+      actionRef.current?.reload();
+    } catch (error) {
+      hide();
+      messageApi.error(error instanceof Error ? error.message : '创建面单任务失败');
+    }
+  };
+
+  const handleBatchMarkPickup = async () => {
+    if (!selectedRows.length) {
+      messageApi.warning('请先选择订单');
+      return;
+    }
+
+    const shopId = resolveSingleShopId(selectedRows);
+    if (!shopId) {
+      messageApi.error('批量标记待揽收暂只支持同一店铺订单');
+      return;
+    }
+
+    const hide = messageApi.loading('正在标记待揽收...', 0);
+    try {
+      const response = await batchMarkLiveOrdersReadyForPickup({
+        shopId,
+        orders: selectedRows.map((row) => ({
+          orderSn: row.orderSn,
+          packageNumber: row.packageNumber,
+        })),
+      });
+      hide();
+      const successCount = response.data.successList.length;
+      const failCount = response.data.failList.length;
+      if (failCount) {
+        messageApi.warning(`已成功 ${successCount} 条，失败 ${failCount} 条`);
+      } else {
+        messageApi.success(`已标记 ${successCount} 条订单为待揽收`);
+      }
+      actionRef.current?.reload();
+    } catch (error) {
+      hide();
+      messageApi.error(error instanceof Error ? error.message : '标记待揽收失败');
+    }
+  };
 
   const columns = useMemo<ProColumns<ERP.OrderListItem>[]>(
     () =>
@@ -520,6 +598,13 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   onSuccess={() => actionRef.current?.reloadAndRest?.()}
                 />,
                 <Button
+                  key="mark-pickup"
+                  disabled={!selectedRows.length}
+                  onClick={handleBatchMarkPickup}
+                >
+                  批量待揽收
+                </Button>,
+                <Button
                   key="export"
                   onClick={() =>
                     messageApi.success(`已提交 ${selectedTargetLabel} 导出任务`)
@@ -529,9 +614,8 @@ const OrderTable: React.FC<OrderTableProps> = ({
                 </Button>,
                 <Button
                   key="print"
-                  onClick={() =>
-                    messageApi.success(`已提交 ${selectedTargetLabel} 打印任务`)
-                  }
+                  disabled={!selectedRows.length}
+                  onClick={handleBatchPrint}
                 >
                   批量打印
                 </Button>,
