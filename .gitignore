@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+
+.env
+.env.*
+!.env.example
+
+apps/web/node_modules
+apps/web/dist
+
+apps/api/node_modules
+apps/api/dist
+apps/api/generated
