@@ -33,18 +33,6 @@ class ErpNonIntegratedDto {
   trackingNumber?: string;
 }
 
-export class ErpPrintLabelTaskDto {
-  @IsString()
-  shopId!: string;
-
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(50)
-  @ValidateNested({ each: true })
-  @Type(() => ErpPrintLabelTaskItemDto)
-  orders!: ErpPrintLabelTaskItemDto[];
-}
-
 export class ErpPrintLabelTaskItemDto {
   @IsString()
   orderSn!: string;
@@ -58,9 +46,45 @@ export class ErpPrintLabelTaskItemDto {
   shippingDocumentType?: string;
 }
 
+export class ErpPrintLabelTaskDto {
+  @IsString()
+  shopId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ErpPrintLabelTaskItemDto)
+  orders!: ErpPrintLabelTaskItemDto[];
+}
+
 export class ErpMarkReadyForPickupDto {
   @IsString()
   shopId!: string;
+
+  @IsOptional()
+  @IsString()
+  packageNumber?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ErpPickupDto)
+  pickup?: ErpPickupDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ErpDropoffDto)
+  dropoff?: ErpDropoffDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ErpNonIntegratedDto)
+  nonIntegrated?: ErpNonIntegratedDto;
+}
+
+export class ErpBatchPickupItemDto {
+  @IsString()
+  orderSn!: string;
 
   @IsOptional()
   @IsString()
@@ -92,9 +116,4 @@ export class ErpBatchMarkReadyForPickupDto {
   @ValidateNested({ each: true })
   @Type(() => ErpBatchPickupItemDto)
   orders!: ErpBatchPickupItemDto[];
-}
-
-export class ErpBatchPickupItemDto extends ErpMarkReadyForPickupDto {
-  @IsString()
-  orderSn!: string;
 }
