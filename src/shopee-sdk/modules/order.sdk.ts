@@ -6,6 +6,20 @@ import {
   ShopeeOrderListParams,
 } from 'src/common/shopee.types';
 
+export interface ShopeeShippingDocumentPackageInput {
+  orderSn: string;
+  packageNumber?: string;
+  shippingDocumentType?: string;
+}
+
+export interface ShopeeShipOrderInput {
+  orderSn: string;
+  packageNumber?: string;
+  pickup?: Record<string, unknown>;
+  dropoff?: Record<string, unknown>;
+  nonIntegrated?: Record<string, unknown>;
+}
+
 @Injectable()
 export class OrderSdk {
   constructor(
@@ -43,7 +57,7 @@ export class OrderSdk {
       query: {
         order_sn_list: orderSn,
         response_optional_fields:
-          'buyer_user_id,buyer_username,item_list,total_amount,order_status,payment_method,create_time,update_time',
+          'buyer_user_id,buyer_username,item_list,total_amount,currency,order_status,payment_method,create_time,update_time,package_list,shipping_carrier,checkout_shipping_carrier,recipient_address,message_to_seller',
       },
     });
   }
@@ -76,6 +90,60 @@ export class OrderSdk {
       body: {
         order_sn: orderSn,
         cancel_reason: cancelReason,
+      },
+    });
+  }
+
+  createShippingDocument(
+    shopId: string,
+    packages: ShopeeShippingDocumentPackageInput[],
+  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
+    return this.shopeeApiClientService.request({
+      path: '/api/v2/logistics/create_shipping_document',
+      method: 'POST',
+      shopId,
+      body: {
+        order_list: packages.map((item) => ({
+          order_sn: item.orderSn,
+          package_number: item.packageNumber,
+          shipping_document_type: item.shippingDocumentType,
+        })),
+      },
+    });
+  }
+
+  downloadShippingDocument(
+    shopId: string,
+    packages: ShopeeShippingDocumentPackageInput[],
+  ): Promise<Buffer> {
+    return this.shopeeApiClientService.download({
+      path: '/api/v2/logistics/download_shipping_document',
+      method: 'POST',
+      shopId,
+      body: {
+        shipping_document_type: packages[0]?.shippingDocumentType,
+        order_list: packages.map((item) => ({
+          order_sn: item.orderSn,
+          package_number: item.packageNumber,
+        })),
+      },
+    });
+  }
+
+  shipOrder(
+    shopId: string,
+    input: ShopeeShipOrderInput,
+  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
+    return this.shopeeApiClientService.request({
+      path: '/api/v2/logistics/ship_order',
+      method: 'POST',
+      shopId,
+      body: {
+        order_sn: input.orderSn,
+        package_number: input.packageNumber,
+        pickup: input.pickup,
+        dropoff: input.dropoff,
+        non_integrated: input.nonIntegrated,
       },
     });
   }
