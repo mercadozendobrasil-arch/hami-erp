@@ -438,6 +438,12 @@ export default [
     ],
   },
   {
+    path: '/knowledge',
+    name: 'knowledge',
+    icon: 'book',
+    component: './knowledge',
+  },
+  {
     path: '/chatbot',
     name: 'chatbot',
     icon: 'robot',
