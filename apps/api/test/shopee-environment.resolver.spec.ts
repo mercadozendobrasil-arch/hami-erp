@@ -51,6 +51,30 @@ describe('ShopeeEnvironmentResolver', () => {
     ).toThrow(InternalServerErrorException);
   });
 
+  it('defaults to sandbox configuration when SHOPEE_ENV is not set', () => {
+    const resolver = createResolver({
+      SHOPEE_SANDBOX_BASE_URL: 'https://partner.test-stable.shopeemobile.com',
+      SHOPEE_SANDBOX_PARTNER_ID: '1001',
+      SHOPEE_SANDBOX_PARTNER_KEY: 'sandbox-key',
+      SHOPEE_SANDBOX_REDIRECT_URL: 'https://sandbox.example.com/callback',
+    });
+
+    expect(resolver.getCurrentConfig().env).toBe('sandbox');
+  });
+
+  it('falls back to sandbox when production credentials are incomplete', () => {
+    const resolver = createResolver({
+      SHOPEE_ENV: 'production',
+      SHOPEE_SANDBOX_PARTNER_ID: '1001',
+      SHOPEE_SANDBOX_PARTNER_KEY: 'sandbox-key',
+      SHOPEE_SANDBOX_REDIRECT_URL: 'https://sandbox.example.com/callback',
+      SHOPEE_PROD_PARTNER_ID: '2002',
+    });
+
+    expect(resolver.getCurrentConfig().env).toBe('sandbox');
+    expect(resolver.getCurrentConfig().partnerId).toBe(1001);
+  });
+
   it('throws when partnerId is missing for the active environment', () => {
     expect(() =>
       createResolver({
@@ -61,13 +85,13 @@ describe('ShopeeEnvironmentResolver', () => {
     ).toThrow('Missing SHOPEE_SANDBOX_PARTNER_ID configuration.');
   });
 
-  it('throws when partnerKey is missing for the active environment', () => {
+  it('throws when partnerKey is missing for the active sandbox environment', () => {
     expect(() =>
       createResolver({
-        SHOPEE_ENV: 'production',
-        SHOPEE_PROD_PARTNER_ID: '2002',
-        SHOPEE_PROD_REDIRECT_URL: 'https://prod.example.com/callback',
+        SHOPEE_ENV: 'sandbox',
+        SHOPEE_SANDBOX_PARTNER_ID: '1001',
+        SHOPEE_SANDBOX_REDIRECT_URL: 'https://sandbox.example.com/callback',
       }),
-    ).toThrow('Missing SHOPEE_PROD_PARTNER_KEY configuration.');
+    ).toThrow('Missing SHOPEE_SANDBOX_PARTNER_KEY configuration.');
   });
 });

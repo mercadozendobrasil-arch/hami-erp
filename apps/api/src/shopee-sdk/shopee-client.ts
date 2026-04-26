@@ -7,16 +7,9 @@ import {
   type ShopeeAuthUrlOptions,
   type ShopeeRefreshTokenRequest,
   type ShopeeRequestOptions,
+  type ShopeeTokenPayload,
   type ShopeeTokenRequest,
 } from './sdk.types';
-
-interface ShopeeTokenPayload {
-  access_token: string;
-  expire_in: number;
-  refresh_token: string;
-  request_id?: string;
-  shop_id: number;
-}
 
 @Injectable()
 export class ShopeeClient {
@@ -63,5 +56,11 @@ export class ShopeeClient {
     request: ShopeeRequestOptions<TBody>,
   ): Promise<ShopeeApiResponse<TResponse>> {
     return this.shopeeHttpService.request<TResponse, TBody>(request);
+  }
+
+  async download<TBody = unknown>(
+    request: ShopeeRequestOptions<TBody>,
+  ): Promise<Buffer> {
+    return this.shopeeHttpService.download(request);
   }
 }

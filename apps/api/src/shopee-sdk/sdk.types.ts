@@ -47,6 +47,7 @@ export interface ShopeeRateLimitOptions {
 
 export interface ShopeeSdkConfig {
   baseUrl: string;
+  environment: 'production' | 'sandbox';
   partnerId: number;
   partnerKey: string;
   timeoutMs: number;
@@ -76,6 +77,14 @@ export interface ShopeeTokenRequest {
   timestamp?: number;
 }
 
+export interface ShopeeTokenPayload {
+  access_token: string;
+  expire_in: number;
+  refresh_token: string;
+  request_id?: string;
+  shop_id: number;
+}
+
 export interface ShopeeRefreshTokenRequest {
   refreshToken: string;
   shopId: number | string;
@@ -89,6 +98,7 @@ export interface ShopeeRequestOptions<TBody = unknown> {
   method?: ShopeeHttpMethod;
   query?: Record<string, ShopeeQueryValue>;
   body?: TBody;
+  contentType?: 'application/json' | 'multipart/form-data';
   headers?: Record<string, string>;
   accessToken?: string;
   shopId?: number | string;

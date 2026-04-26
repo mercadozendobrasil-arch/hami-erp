@@ -42,12 +42,24 @@ export class ShopeeEnvironmentResolver {
   private getEnvironment(): ShopeeEnvironment {
     const env = this.configService.get<string>('SHOPEE_ENV');
 
-    if (env === 'sandbox' || env === 'production') {
-      return env;
+    if (!env || env === 'sandbox') {
+      return 'sandbox';
+    }
+
+    if (env === 'production') {
+      return this.hasProductionCredentials() ? 'production' : 'sandbox';
     }
 
     throw new InternalServerErrorException(
       `Invalid SHOPEE_ENV "${env ?? ''}". Expected "sandbox" or "production".`,
+    );
+  }
+
+  private hasProductionCredentials(): boolean {
+    return (
+      Boolean(this.configService.get<string>('SHOPEE_PROD_PARTNER_ID')) &&
+      Boolean(this.configService.get<string>('SHOPEE_PROD_PARTNER_KEY')) &&
+      Boolean(this.configService.get<string>('SHOPEE_PROD_REDIRECT_URL'))
     );
   }
 

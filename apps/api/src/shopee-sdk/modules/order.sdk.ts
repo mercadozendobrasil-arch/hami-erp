@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { ShopeeApiClientService } from 'src/common/shopee-api-client.service';
 import {
   ShopeeApiEnvelope,
   ShopeeOrderListParams,
 } from 'src/common/shopee.types';
+import { ShopeeTokenService } from 'src/common/shopee-token.service';
+
+import { ShopeeClient } from '../shopee-client';
+import { toShopeePayload } from '../shopee-payload';
 
 export interface ShopeeShippingDocumentPackageInput {
   orderSn: string;
@@ -23,17 +26,17 @@ export interface ShopeeShipOrderInput {
 @Injectable()
 export class OrderSdk {
   constructor(
-    private readonly shopeeApiClientService: ShopeeApiClientService,
+    private readonly shopeeClient: ShopeeClient,
+    private readonly tokenService: ShopeeTokenService,
   ) {}
 
-  getOrderList(
+  async getOrderList(
     shopId: string,
     params: ShopeeOrderListParams,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/order/get_order_list',
       method: 'GET',
-      shopId,
       query: {
         time_range_field: params.timeRangeField,
         time_from: params.timeFrom,
@@ -46,14 +49,13 @@ export class OrderSdk {
     });
   }
 
-  getOrderDetail(
+  async getOrderDetail(
     shopId: string,
     orderSn: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/order/get_order_detail',
       method: 'GET',
-      shopId,
       query: {
         order_sn_list: orderSn,
         response_optional_fields:
@@ -62,15 +64,14 @@ export class OrderSdk {
     });
   }
 
-  setNote(
+  async setNote(
     shopId: string,
     orderSn: string,
     note: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/order/set_note',
       method: 'POST',
-      shopId,
       body: {
         order_sn: orderSn,
         note,
@@ -78,15 +79,14 @@ export class OrderSdk {
     });
   }
 
-  cancelOrder(
+  async cancelOrder(
     shopId: string,
     orderSn: string,
     cancelReason: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/order/cancel_order',
       method: 'POST',
-      shopId,
       body: {
         order_sn: orderSn,
         cancel_reason: cancelReason,
@@ -94,14 +94,13 @@ export class OrderSdk {
     });
   }
 
-  createShippingDocument(
+  async createShippingDocument(
     shopId: string,
     packages: ShopeeShippingDocumentPackageInput[],
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/logistics/create_shipping_document',
       method: 'POST',
-      shopId,
       body: {
         order_list: packages.map((item) => ({
           order_sn: item.orderSn,
@@ -112,14 +111,19 @@ export class OrderSdk {
     });
   }
 
-  downloadShippingDocument(
+  async downloadShippingDocument(
     shopId: string,
     packages: ShopeeShippingDocumentPackageInput[],
   ): Promise<Buffer> {
-    return this.shopeeApiClientService.download({
+    const { token } = await this.tokenService.findRequiredTokenByShopId(
+      BigInt(shopId),
+    );
+
+    return this.shopeeClient.download({
       path: '/api/v2/logistics/download_shipping_document',
       method: 'POST',
       shopId,
+      accessToken: token.accessToken,
       body: {
         shipping_document_type: packages[0]?.shippingDocumentType,
         order_list: packages.map((item) => ({
@@ -127,24 +131,42 @@ export class OrderSdk {
           package_number: item.packageNumber,
         })),
       },
+      headers: {
+        accept: 'application/pdf,application/octet-stream,application/json',
+      },
     });
   }
 
-  shipOrder(
+  async shipOrder(
     shopId: string,
     input: ShopeeShipOrderInput,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+    return this.requestWithStoredToken(shopId, {
       path: '/api/v2/logistics/ship_order',
       method: 'POST',
-      shopId,
-      body: {
-        order_sn: input.orderSn,
-        package_number: input.packageNumber,
-        pickup: input.pickup,
-        dropoff: input.dropoff,
-        non_integrated: input.nonIntegrated,
-      },
+      body: toShopeePayload(input),
     });
+  }
+
+  private async requestWithStoredToken(
+    shopId: string,
+    request: {
+      path: string;
+      method: 'GET' | 'POST';
+      query?: Record<string, string | number | boolean | undefined>;
+      body?: unknown;
+      headers?: Record<string, string>;
+    },
+  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
+    const { token } = await this.tokenService.findRequiredTokenByShopId(
+      BigInt(shopId),
+    );
+    const response = await this.shopeeClient.request<Record<string, unknown>>({
+      ...request,
+      shopId,
+      accessToken: token.accessToken,
+    });
+
+    return response.raw;
   }
 }

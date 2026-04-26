@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
@@ -7,6 +7,14 @@ import { ShopeeClient } from './shopee-client';
 import { ShopeeErrorMapper } from './shopee-error.mapper';
 import { ShopeeHttpService } from './shopee-http.service';
 import { ShopeeSignature } from './shopee-signature';
+import { AuthSdk } from './modules/auth.sdk';
+import { LogisticsSdk } from './modules/logistics.sdk';
+import { MediaSdk } from './modules/media.sdk';
+import { OrderSdk } from './modules/order.sdk';
+import { PaymentSdk } from './modules/payment.sdk';
+import { ProductSdk } from './modules/product.sdk';
+import { ShopSdk } from './modules/shop.sdk';
+import { WebhookSdk } from './modules/webhook.sdk';
 import {
   SHOPEE_API_LOGGER,
   SHOPEE_SDK_OPTIONS,
@@ -20,6 +28,7 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
   },
 };
 
+@Global()
 @Module({
   imports: [ConfigModule],
   providers: [
@@ -34,6 +43,7 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
 
         return {
           baseUrl: shopeeConfig.baseUrl,
+          environment: shopeeConfig.env,
           partnerId: shopeeConfig.partnerId,
           partnerKey: shopeeConfig.partnerKey,
           timeoutMs: Number(
@@ -69,6 +79,14 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
     ShopeeErrorMapper,
     ShopeeHttpService,
     ShopeeClient,
+    AuthSdk,
+    ShopSdk,
+    ProductSdk,
+    MediaSdk,
+    LogisticsSdk,
+    OrderSdk,
+    PaymentSdk,
+    WebhookSdk,
   ],
   exports: [
     SHOPEE_SDK_OPTIONS,
@@ -77,6 +95,14 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
     ShopeeErrorMapper,
     ShopeeHttpService,
     ShopeeClient,
+    AuthSdk,
+    ShopSdk,
+    ProductSdk,
+    MediaSdk,
+    LogisticsSdk,
+    OrderSdk,
+    PaymentSdk,
+    WebhookSdk,
   ],
 })
 export class ShopeeSdkModule {}

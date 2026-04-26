@@ -1,13 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 
-import { ShopeeAuthService } from 'src/common/shopee-auth.service';
-import { ShopeeSignatureService } from 'src/common/shopee-signature.service';
 import {
   ORDER_SYNC_QUEUE,
   WEBHOOK_EVENT_QUEUE,
 } from 'src/infra/queue/queue.constants';
-import { WebhookSdk } from 'src/shopee-sdk/modules/webhook.sdk';
 
 import { shopeeWebhookRawBodyMiddleware } from './raw-body.middleware';
 import { WebhooksController } from './webhooks.controller';
@@ -26,13 +23,7 @@ import { WebhooksService } from './webhooks.service';
     ),
   ],
   controllers: [WebhooksController],
-  providers: [
-    WebhooksService,
-    WebhooksProcessor,
-    WebhookSdk,
-    ShopeeAuthService,
-    ShopeeSignatureService,
-  ],
+  providers: [WebhooksService, WebhooksProcessor],
 })
 export class WebhooksModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

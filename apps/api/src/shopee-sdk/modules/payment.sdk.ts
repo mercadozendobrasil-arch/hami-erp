@@ -1,43 +1,47 @@
 import { Injectable } from '@nestjs/common';
 
-import { ShopeeApiClientService } from 'src/common/shopee-api-client.service';
-import { ShopeeApiEnvelope } from 'src/common/shopee.types';
+import { ShopeeTokenService } from 'src/common/shopee-token.service';
+
+import { ShopeeClient } from '../shopee-client';
 
 @Injectable()
 export class PaymentSdk {
   constructor(
-    private readonly shopeeApiClientService: ShopeeApiClientService,
+    private readonly shopeeClient: ShopeeClient,
+    private readonly tokenService: ShopeeTokenService,
   ) {}
 
-  getEscrowDetail(
-    shopId: string,
-    orderSn: string,
-  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+  async getEscrowDetail(shopId: string, orderSn: string) {
+    const credentials = await this.getCredentials(shopId);
+    const response = await this.shopeeClient.request<Record<string, unknown>>({
       path: '/api/v2/payment/get_escrow_detail',
       method: 'GET',
-      shopId,
+      shopId: credentials.shopId,
+      accessToken: credentials.accessToken,
       query: {
         order_sn: orderSn,
       },
     });
+
+    return response.raw;
   }
 
-  getPayoutDetail(
-    shopId: string,
-    payoutId: string,
-  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+  async getPayoutDetail(shopId: string, payoutId: string) {
+    const credentials = await this.getCredentials(shopId);
+    const response = await this.shopeeClient.request<Record<string, unknown>>({
       path: '/api/v2/payment/get_payout_detail',
       method: 'GET',
-      shopId,
+      shopId: credentials.shopId,
+      accessToken: credentials.accessToken,
       query: {
         payout_id: payoutId,
       },
     });
+
+    return response.raw;
   }
 
-  getWalletTransactionList(
+  async getWalletTransactionList(
     shopId: string,
     params: {
       pageNo?: number;
@@ -46,11 +50,13 @@ export class PaymentSdk {
       createTimeTo?: number;
       transactionType?: string;
     },
-  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
-    return this.shopeeApiClientService.request({
+  ) {
+    const credentials = await this.getCredentials(shopId);
+    const response = await this.shopeeClient.request<Record<string, unknown>>({
       path: '/api/v2/payment/get_wallet_transaction_list',
       method: 'GET',
-      shopId,
+      shopId: credentials.shopId,
+      accessToken: credentials.accessToken,
       query: {
         page_no: params.pageNo,
         page_size: params.pageSize,
@@ -59,5 +65,18 @@ export class PaymentSdk {
         transaction_type: params.transactionType,
       },
     });
+
+    return response.raw;
+  }
+
+  private async getCredentials(shopId: string) {
+    const { token } = await this.tokenService.findRequiredTokenByShopId(
+      BigInt(shopId),
+    );
+
+    return {
+      shopId,
+      accessToken: token.accessToken,
+    };
   }
 }

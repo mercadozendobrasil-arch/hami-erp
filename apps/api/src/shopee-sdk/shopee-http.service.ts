@@ -59,6 +59,52 @@ export class ShopeeHttpService {
     );
   }
 
+  async download<TBody = unknown>(
+    request: ShopeeRequestOptions<TBody>,
+  ): Promise<Buffer> {
+    const timestamp = request.timestamp ?? this.signature.getTimestamp();
+    const url = this.buildSignedUrl(request, timestamp);
+    const { signal, cleanup } = this.createAbortSignal(
+      request.signal,
+      request.timeoutMs ?? this.config.timeoutMs,
+    );
+    const init = this.buildFetchInit(request, signal);
+
+    try {
+      const response = await this.fetchImpl(url, init);
+      const contentType = response.headers.get('content-type') ?? '';
+
+      if (contentType.includes('application/json')) {
+        const responseBody = await response.text();
+        const payload = this.parsePayload<unknown>(responseBody);
+
+        if (!response.ok) {
+          throw this.errorMapper.mapHttpError(
+            response.status,
+            payload,
+            responseBody,
+          );
+        }
+
+        if (payload.error) {
+          throw this.errorMapper.mapApiError(payload, response.status);
+        }
+
+        return Buffer.from(JSON.stringify(payload));
+      }
+
+      if (!response.ok) {
+        throw this.errorMapper.mapHttpError(response.status);
+      }
+
+      return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      throw this.errorMapper.mapUnknown(error);
+    } finally {
+      cleanup();
+    }
+  }
+
   private async executeHooks<T>(
     context: ShopeeHttpHookContext,
     index: number,
@@ -204,7 +250,10 @@ export class ShopeeHttpService {
   ): RequestInit {
     const headers = new Headers(request.headers ?? {});
 
-    if (!headers.has('content-type')) {
+    if (
+      request.contentType !== 'multipart/form-data' &&
+      !headers.has('content-type')
+    ) {
       headers.set('content-type', 'application/json');
     }
 
@@ -213,7 +262,11 @@ export class ShopeeHttpService {
     }
 
     const body =
-      request.body === undefined ? undefined : JSON.stringify(request.body);
+      request.body === undefined
+        ? undefined
+        : request.contentType === 'multipart/form-data'
+          ? this.toFormData(request.body)
+          : JSON.stringify(request.body);
 
     return {
       method: request.method ?? 'POST',
@@ -221,6 +274,42 @@ export class ShopeeHttpService {
       body,
       signal,
     };
+  }
+
+  private toFormData(payload: unknown): FormData {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new ShopeeSdkError({
+        code: 'INVALID_MULTIPART_PAYLOAD',
+        message: 'Shopee multipart payload must be an object',
+        retryable: false,
+        details: payload,
+      });
+    }
+
+    const formData = new FormData();
+
+    for (const [key, value] of Object.entries(payload)) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      if (value instanceof Blob) {
+        formData.append(key, value);
+        continue;
+      }
+
+      if (value instanceof Buffer || value instanceof Uint8Array) {
+        formData.append(key, new Blob([new Uint8Array(value)]));
+        continue;
+      }
+
+      formData.append(
+        key,
+        typeof value === 'string' ? value : JSON.stringify(value),
+      );
+    }
+
+    return formData;
   }
 
   private parsePayload<TResponse>(

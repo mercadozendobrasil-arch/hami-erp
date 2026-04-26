@@ -1,22 +1,27 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { ShopeeEnvironmentResolver } from 'src/common/shopee-environment.resolver';
 import { ParsedWebhookEvent } from 'src/common/shopee.types';
-import { ShopeeAuthService } from 'src/common/shopee-auth.service';
-import { ShopeeSignatureService } from 'src/common/shopee-signature.service';
 
 @Injectable()
 export class WebhookSdk {
   constructor(
-    private readonly shopeeAuthService: ShopeeAuthService,
-    private readonly shopeeSignatureService: ShopeeSignatureService,
+    private readonly configService: ConfigService,
+    private readonly shopeeEnvironmentResolver: ShopeeEnvironmentResolver,
   ) {}
 
   verifySignature(rawBody: string, signature: string): boolean {
-    return this.shopeeSignatureService.verifyWebhookSignature({
-      rawBody,
-      signature,
-      secret: this.shopeeAuthService.getWebhookSecret(),
-    });
+    const secret =
+      this.configService.get<string>('SHOPEE_WEBHOOK_SECRET') ??
+      this.shopeeEnvironmentResolver.getCurrentConfig().partnerKey;
+    const expected = createHmac('sha256', secret)
+      .update(rawBody, 'utf8')
+      .digest('hex');
+
+    return this.secureCompare(expected, signature);
   }
 
   parseEvent(payload: string | Record<string, unknown>): ParsedWebhookEvent {
@@ -50,6 +55,16 @@ export class WebhookSdk {
       shopId,
       payload: parsedPayload,
     };
+  }
+
+  private secureCompare(expected: string, actual: string): boolean {
+    const expectedBuffer = Buffer.from(expected);
+    const actualBuffer = Buffer.from(actual);
+
+    return (
+      expectedBuffer.length === actualBuffer.length &&
+      timingSafeEqual(expectedBuffer, actualBuffer)
+    );
   }
 
   private pickString(

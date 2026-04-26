@@ -5,7 +5,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
-import { ShopeeCommonModule } from './common/shopee/shopee-common.module';
 import { ErpModule } from './erp/erp.module';
 import { PrismaModule } from './infra/database/prisma.module';
 import { QueueModule } from './infra/queue/queue.module';
@@ -17,6 +16,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { ShopeeSdkModule } from './shopee-sdk/shopee-sdk.module';
 
 @Module({
   imports: [
@@ -38,10 +38,10 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     }),
     CommonModule,
     PrismaModule,
+    ShopeeSdkModule,
     QueueModule,
     AuthModule,
     ShopsModule,
-    ShopeeCommonModule,
     ProductsModule,
     MediaModule,
     LogisticsModule,

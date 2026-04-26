@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { ShopeeHttpClient } from '../../common/shopee/shopee-http.client';
+import { ShopeeClient } from '../shopee-client';
 
 export interface ShopeeUploadImagePayload {
   image: Buffer | Uint8Array;
@@ -9,10 +9,10 @@ export interface ShopeeUploadImagePayload {
 
 @Injectable()
 export class MediaSdk {
-  constructor(private readonly shopeeHttpClient: ShopeeHttpClient) {}
+  constructor(private readonly shopeeClient: ShopeeClient) {}
 
-  uploadImage(payload: ShopeeUploadImagePayload) {
-    return this.shopeeHttpClient.request<{
+  async uploadImage(payload: ShopeeUploadImagePayload) {
+    const response = await this.shopeeClient.request<{
       image_info?: {
         image_id: string;
         image_url?: string;
@@ -20,17 +20,19 @@ export class MediaSdk {
       upload_id?: string;
     }>({
       method: 'POST',
-      path: '/media_space/upload_image',
+      path: '/api/v2/media_space/upload_image',
       contentType: 'multipart/form-data',
       body: {
         image: new Blob([new Uint8Array(payload.image)]),
         file_name: payload.fileName,
       },
     });
+
+    return response.data;
   }
 
-  getImageUploadResult(uploadId: string) {
-    return this.shopeeHttpClient.request<{
+  async getImageUploadResult(uploadId: string) {
+    const response = await this.shopeeClient.request<{
       image_info?: {
         image_id: string;
         image_url?: string;
@@ -38,10 +40,12 @@ export class MediaSdk {
       };
     }>({
       method: 'GET',
-      path: '/media_space/get_image_upload_result',
+      path: '/api/v2/media_space/get_image_upload_result',
       query: {
         upload_id: uploadId,
       },
     });
+
+    return response.data;
   }
 }

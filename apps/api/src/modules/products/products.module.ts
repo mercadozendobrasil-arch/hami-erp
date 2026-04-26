@@ -6,7 +6,6 @@ import {
   ProductSyncProcessor,
   ProductSyncQueueService,
 } from '../../infra/queue/product-sync.queue';
-import { ShopeeCommonModule } from '../../common/shopee/shopee-common.module';
 import { ProductPayloadMapper } from './product-payload.mapper';
 import { ProductPublishService } from './product-publish.service';
 import { ProductValidationService } from './product-validation.service';
@@ -15,7 +14,6 @@ import { ProductsService } from './products.service';
 
 @Module({
   imports: [
-    ShopeeCommonModule,
     BullModule.registerQueue({
       name: PRODUCT_SYNC_QUEUE,
     }),
