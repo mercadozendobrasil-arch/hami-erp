@@ -44,6 +44,7 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
         return {
           baseUrl: shopeeConfig.baseUrl,
           environment: shopeeConfig.env,
+          apiVersion: configService.get<string>('SHOPEE_API_VERSION', 'v2'),
           partnerId: shopeeConfig.partnerId,
           partnerKey: shopeeConfig.partnerKey,
           timeoutMs: Number(

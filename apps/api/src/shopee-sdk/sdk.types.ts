@@ -48,6 +48,7 @@ export interface ShopeeRateLimitOptions {
 export interface ShopeeSdkConfig {
   baseUrl: string;
   environment: 'production' | 'sandbox';
+  apiVersion: string;
   partnerId: number;
   partnerKey: string;
   timeoutMs: number;

@@ -120,7 +120,7 @@ export class ProductSdk {
   getCategory(language = 'en'): Promise<{ categories: ShopeeCategory[] }> {
     return this.requestData({
       method: 'GET',
-      path: '/api/v2/product/get_category',
+      path: '/product/get_category',
       query: { language },
     });
   }
@@ -128,7 +128,7 @@ export class ProductSdk {
   getAttributeTree(categoryId: number, language = 'en') {
     return this.requestData<{ attribute_list: ShopeeAttribute[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_attribute_tree',
+      path: '/product/get_attribute_tree',
       query: {
         category_id: categoryId,
         language,
@@ -139,7 +139,7 @@ export class ProductSdk {
   getBrandList(categoryId: number, status = 'NORMAL') {
     return this.requestData<{ brand_list: ShopeeBrand[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_brand_list',
+      path: '/product/get_brand_list',
       query: {
         category_id: categoryId,
         status,
@@ -150,7 +150,7 @@ export class ProductSdk {
   getItemLimit(categoryId: number) {
     return this.requestData<{ item_limit: number }>({
       method: 'GET',
-      path: '/api/v2/product/get_item_limit',
+      path: '/product/get_item_limit',
       query: {
         category_id: categoryId,
       },
@@ -163,7 +163,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ item: ShopeeItemSummary[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_item_list',
+      path: '/product/get_item_list',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: {
@@ -176,7 +176,7 @@ export class ProductSdk {
   getItemBaseInfo(context: ShopeeBusinessContext, itemIds: number[]) {
     return this.requestData<{ item_list: unknown[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_item_base_info',
+      path: '/product/get_item_base_info',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: {
@@ -188,7 +188,7 @@ export class ProductSdk {
   getItemExtraInfo(context: ShopeeBusinessContext, itemIds: number[]) {
     return this.requestData<{ item_list: unknown[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_item_extra_info',
+      path: '/product/get_item_extra_info',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: {
@@ -200,7 +200,7 @@ export class ProductSdk {
   addItem(context: ShopeeBusinessContext, payload: ShopeeProductPayload) {
     return this.requestData<{ item_id: number }>({
       method: 'POST',
-      path: '/api/v2/product/add_item',
+      path: '/product/add_item',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload(payload),
@@ -214,7 +214,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/update_item',
+      path: '/product/update_item',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, ...payload }),
@@ -224,7 +224,7 @@ export class ProductSdk {
   deleteItem(context: ShopeeBusinessContext, itemId: number) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/delete_item',
+      path: '/product/delete_item',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId }),
@@ -234,7 +234,7 @@ export class ProductSdk {
   unlistItem(context: ShopeeBusinessContext, itemId: number) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/unlist_item',
+      path: '/product/unlist_item',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId }),
@@ -244,7 +244,7 @@ export class ProductSdk {
   searchItem(context: ShopeeBusinessContext, payload: ShopeeSearchItemPayload) {
     return this.requestData<{ item: ShopeeItemSummary[] }>({
       method: 'POST',
-      path: '/api/v2/product/search_item',
+      path: '/product/search_item',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload(payload),
@@ -257,7 +257,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/update_price',
+      path: '/product/update_price',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload(payload),
@@ -270,7 +270,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/update_stock',
+      path: '/product/update_stock',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload(payload),
@@ -280,7 +280,7 @@ export class ProductSdk {
   getItemViolationInfo(context: ShopeeBusinessContext, itemId: number) {
     return this.requestData<{ violation_list: unknown[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_item_violation_info',
+      path: '/product/get_item_violation_info',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: { item_id_list: String(itemId) },
@@ -294,7 +294,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/init_tier_variation',
+      path: '/product/init_tier_variation',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, tierVariation }),
@@ -308,7 +308,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/update_tier_variation',
+      path: '/product/update_tier_variation',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, tierVariation }),
@@ -318,7 +318,7 @@ export class ProductSdk {
   getModelList(context: ShopeeBusinessContext, itemId: number) {
     return this.requestData<{ model: unknown[] }>({
       method: 'GET',
-      path: '/api/v2/product/get_model_list',
+      path: '/product/get_model_list',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: { item_id: itemId },
@@ -332,7 +332,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/add_model',
+      path: '/product/add_model',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, modelList }),
@@ -346,7 +346,7 @@ export class ProductSdk {
   ) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/update_model',
+      path: '/product/update_model',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, model }),
@@ -356,7 +356,7 @@ export class ProductSdk {
   deleteModel(context: ShopeeBusinessContext, itemId: number, modelId: number) {
     return this.requestData<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/product/delete_model',
+      path: '/product/delete_model',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({ itemId, modelId }),

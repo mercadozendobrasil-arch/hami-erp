@@ -26,7 +26,7 @@ export class ShopeeClient {
     request: ShopeeTokenRequest,
   ): Promise<ShopeeApiResponse<ShopeeTokenPayload>> {
     return this.shopeeHttpService.request<ShopeeTokenPayload>({
-      path: '/api/v2/auth/token/get',
+      path: '/auth/token/get',
       method: 'POST',
       shopId: request.shopId,
       timestamp: request.timestamp,
@@ -41,7 +41,7 @@ export class ShopeeClient {
     request: ShopeeRefreshTokenRequest,
   ): Promise<ShopeeApiResponse<ShopeeTokenPayload>> {
     return this.shopeeHttpService.request<ShopeeTokenPayload>({
-      path: '/api/v2/auth/access_token/get',
+      path: '/auth/access_token/get',
       method: 'POST',
       shopId: request.shopId,
       timestamp: request.timestamp,

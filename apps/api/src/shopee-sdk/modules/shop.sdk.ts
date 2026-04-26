@@ -15,7 +15,7 @@ export class ShopSdk {
 
   async getShopInfo(params: ShopRequestParams): Promise<ShopeeShopInfo> {
     const response = await this.shopeeClient.request<ShopeeShopInfo>({
-      path: '/api/v2/shop/get_shop_info',
+      path: '/shop/get_shop_info',
       method: 'GET',
       accessToken: params.accessToken,
       shopId: params.shopId.toString(),
@@ -26,7 +26,7 @@ export class ShopSdk {
 
   async getProfile(params: ShopRequestParams): Promise<ShopeeProfileInfo> {
     const response = await this.shopeeClient.request<ShopeeProfileInfo>({
-      path: '/api/v2/shop/get_profile',
+      path: '/shop/get_profile',
       method: 'GET',
       accessToken: params.accessToken,
       shopId: params.shopId.toString(),
@@ -40,7 +40,7 @@ export class ShopSdk {
     payload: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const response = await this.shopeeClient.request<Record<string, unknown>>({
-      path: '/api/v2/shop/update_profile',
+      path: '/shop/update_profile',
       method: 'POST',
       accessToken: params.accessToken,
       shopId: params.shopId.toString(),

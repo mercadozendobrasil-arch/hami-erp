@@ -26,7 +26,9 @@ export class AuthSdk {
     };
   }
 
-  async getAccessToken(params: GetAccessTokenParams): Promise<ShopeeTokenPayload> {
+  async getAccessToken(
+    params: GetAccessTokenParams,
+  ): Promise<ShopeeTokenPayload> {
     const response = await this.shopeeClient.getAccessToken({
       code: params.code,
       shopId: params.shopId.toString(),

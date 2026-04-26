@@ -210,7 +210,8 @@ export class ShopeeHttpService {
     request: ShopeeRequestOptions<TBody>,
     timestamp: number,
   ): string {
-    const url = new URL(request.path, this.config.baseUrl);
+    const path = this.buildApiPath(request.path);
+    const url = new URL(path, this.config.baseUrl);
     const query = new URLSearchParams();
 
     this.appendQueryValues(query, request.query);
@@ -232,7 +233,7 @@ export class ShopeeHttpService {
     query.set(
       'sign',
       this.signature.signRequest({
-        path: request.path,
+        path,
         timestamp,
         accessToken: request.accessToken,
         shopId: request.shopId,
@@ -242,6 +243,14 @@ export class ShopeeHttpService {
 
     url.search = query.toString();
     return url.toString();
+  }
+
+  private buildApiPath(path: string): string {
+    if (path.startsWith('/api/')) {
+      return path;
+    }
+
+    return `/api/${this.config.apiVersion}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
   private buildFetchInit<TBody>(

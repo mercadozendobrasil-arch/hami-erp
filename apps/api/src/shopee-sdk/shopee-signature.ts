@@ -17,13 +17,15 @@ export class ShopeeSignature {
   ) {}
 
   signAuthorization(path: string, timestamp: number): string {
-    return this.signRaw(`${this.config.partnerId}${path}${timestamp}`);
+    const apiPath = this.buildApiPath(path);
+    return this.signRaw(`${this.config.partnerId}${apiPath}${timestamp}`);
   }
 
   signRequest(input: ShopeeSignatureInput): string {
+    const apiPath = this.buildApiPath(input.path);
     const parts = [
       String(this.config.partnerId),
-      input.path,
+      apiPath,
       String(input.timestamp),
     ];
 
@@ -41,7 +43,7 @@ export class ShopeeSignature {
   }
 
   buildAuthorizationUrl(options: ShopeeAuthUrlOptions): string {
-    const path = options.path ?? '/api/v2/shop/auth_partner';
+    const path = this.buildApiPath(options.path ?? '/shop/auth_partner');
     const timestamp = options.timestamp ?? this.getTimestamp();
     const url = new URL(path, this.config.baseUrl);
 
@@ -65,5 +67,13 @@ export class ShopeeSignature {
     return createHmac('sha256', this.config.partnerKey)
       .update(payload, 'utf8')
       .digest('hex');
+  }
+
+  private buildApiPath(path: string): string {
+    if (path.startsWith('/api/')) {
+      return path;
+    }
+
+    return `/api/${this.config.apiVersion}${path.startsWith('/') ? path : `/${path}`}`;
   }
 }

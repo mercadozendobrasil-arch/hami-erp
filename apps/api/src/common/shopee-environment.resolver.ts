@@ -47,19 +47,11 @@ export class ShopeeEnvironmentResolver {
     }
 
     if (env === 'production') {
-      return this.hasProductionCredentials() ? 'production' : 'sandbox';
+      return 'production';
     }
 
     throw new InternalServerErrorException(
       `Invalid SHOPEE_ENV "${env ?? ''}". Expected "sandbox" or "production".`,
-    );
-  }
-
-  private hasProductionCredentials(): boolean {
-    return (
-      Boolean(this.configService.get<string>('SHOPEE_PROD_PARTNER_ID')) &&
-      Boolean(this.configService.get<string>('SHOPEE_PROD_PARTNER_KEY')) &&
-      Boolean(this.configService.get<string>('SHOPEE_PROD_REDIRECT_URL'))
     );
   }
 

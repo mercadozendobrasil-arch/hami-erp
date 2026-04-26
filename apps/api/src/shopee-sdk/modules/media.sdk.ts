@@ -20,7 +20,7 @@ export class MediaSdk {
       upload_id?: string;
     }>({
       method: 'POST',
-      path: '/api/v2/media_space/upload_image',
+      path: '/media_space/upload_image',
       contentType: 'multipart/form-data',
       body: {
         image: new Blob([new Uint8Array(payload.image)]),
@@ -40,7 +40,7 @@ export class MediaSdk {
       };
     }>({
       method: 'GET',
-      path: '/api/v2/media_space/get_image_upload_result',
+      path: '/media_space/get_image_upload_result',
       query: {
         upload_id: uploadId,
       },

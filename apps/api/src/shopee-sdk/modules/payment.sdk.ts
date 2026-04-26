@@ -14,7 +14,7 @@ export class PaymentSdk {
   async getEscrowDetail(shopId: string, orderSn: string) {
     const credentials = await this.getCredentials(shopId);
     const response = await this.shopeeClient.request<Record<string, unknown>>({
-      path: '/api/v2/payment/get_escrow_detail',
+      path: '/payment/get_escrow_detail',
       method: 'GET',
       shopId: credentials.shopId,
       accessToken: credentials.accessToken,
@@ -29,7 +29,7 @@ export class PaymentSdk {
   async getPayoutDetail(shopId: string, payoutId: string) {
     const credentials = await this.getCredentials(shopId);
     const response = await this.shopeeClient.request<Record<string, unknown>>({
-      path: '/api/v2/payment/get_payout_detail',
+      path: '/payment/get_payout_detail',
       method: 'GET',
       shopId: credentials.shopId,
       accessToken: credentials.accessToken,
@@ -53,7 +53,7 @@ export class PaymentSdk {
   ) {
     const credentials = await this.getCredentials(shopId);
     const response = await this.shopeeClient.request<Record<string, unknown>>({
-      path: '/api/v2/payment/get_wallet_transaction_list',
+      path: '/payment/get_wallet_transaction_list',
       method: 'GET',
       shopId: credentials.shopId,
       accessToken: credentials.accessToken,

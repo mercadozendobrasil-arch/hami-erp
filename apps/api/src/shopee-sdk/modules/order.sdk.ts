@@ -35,7 +35,7 @@ export class OrderSdk {
     params: ShopeeOrderListParams,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/order/get_order_list',
+      path: '/order/get_order_list',
       method: 'GET',
       query: {
         time_range_field: params.timeRangeField,
@@ -54,7 +54,7 @@ export class OrderSdk {
     orderSn: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/order/get_order_detail',
+      path: '/order/get_order_detail',
       method: 'GET',
       query: {
         order_sn_list: orderSn,
@@ -70,7 +70,7 @@ export class OrderSdk {
     note: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/order/set_note',
+      path: '/order/set_note',
       method: 'POST',
       body: {
         order_sn: orderSn,
@@ -85,7 +85,7 @@ export class OrderSdk {
     cancelReason: string,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/order/cancel_order',
+      path: '/order/cancel_order',
       method: 'POST',
       body: {
         order_sn: orderSn,
@@ -99,7 +99,7 @@ export class OrderSdk {
     packages: ShopeeShippingDocumentPackageInput[],
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/logistics/create_shipping_document',
+      path: '/logistics/create_shipping_document',
       method: 'POST',
       body: {
         order_list: packages.map((item) => ({
@@ -120,7 +120,7 @@ export class OrderSdk {
     );
 
     return this.shopeeClient.download({
-      path: '/api/v2/logistics/download_shipping_document',
+      path: '/logistics/download_shipping_document',
       method: 'POST',
       shopId,
       accessToken: token.accessToken,
@@ -142,7 +142,7 @@ export class OrderSdk {
     input: ShopeeShipOrderInput,
   ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
     return this.requestWithStoredToken(shopId, {
-      path: '/api/v2/logistics/ship_order',
+      path: '/logistics/ship_order',
       method: 'POST',
       body: toShopeePayload(input),
     });

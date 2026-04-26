@@ -22,7 +22,7 @@ export class LogisticsSdk {
       logistics_channel_list: unknown[];
     }>({
       method: 'GET',
-      path: '/api/v2/logistics/get_channel_list',
+      path: '/logistics/get_channel_list',
       accessToken: context.accessToken,
       shopId: context.shopId,
     });
@@ -35,7 +35,7 @@ export class LogisticsSdk {
       shipping_parameter_info: unknown;
     }>({
       method: 'GET',
-      path: '/api/v2/logistics/get_shipping_parameter',
+      path: '/logistics/get_shipping_parameter',
       accessToken: context.accessToken,
       shopId: context.shopId,
       query: {
@@ -53,7 +53,7 @@ export class LogisticsSdk {
   ) {
     const response = await this.shopeeClient.request<{ success: boolean }>({
       method: 'POST',
-      path: '/api/v2/logistics/update_shipping_info',
+      path: '/logistics/update_shipping_info',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload({
@@ -77,7 +77,7 @@ export class LogisticsSdk {
   ) {
     const response = await this.shopeeClient.request<Record<string, unknown>>({
       method: 'POST',
-      path: '/api/v2/logistics/ship_order',
+      path: '/logistics/ship_order',
       accessToken: context.accessToken,
       shopId: context.shopId,
       body: toShopeePayload(input),
