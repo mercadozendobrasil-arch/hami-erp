@@ -31,7 +31,7 @@ export async function submitShopeeAuthCallback(payload: {
 }
 
 export async function queryShops(params: ERP.PageParams) {
-  return request<API.ListResponse<ERP.ShopListItem>>('/api/erp/shops', {
+  return request<API.ListResponse<ERP.ShopListItem>>('/api/shopee/shops', {
     method: 'GET',
     params,
   });
@@ -39,7 +39,7 @@ export async function queryShops(params: ERP.PageParams) {
 
 export async function syncShop(shopId: string) {
   return request<ERP.ApiResponse<ERP.ShopListItem>>(
-    `/api/erp/shops/${shopId}/sync`,
+    `/api/shopee/shops/${shopId}/sync`,
     {
       method: 'POST',
     },
@@ -48,9 +48,10 @@ export async function syncShop(shopId: string) {
 
 export async function refreshToken(shopId: string) {
   return request<ERP.ApiResponse<Record<string, unknown>>>(
-    `/api/erp/shops/${shopId}/refresh-token`,
+    '/api/shopee/auth/refresh-token',
     {
       method: 'POST',
+      data: { shopId },
     },
   );
 }
