@@ -28,35 +28,6 @@ export class ErpOrdersController {
     return this.erpOrdersService.listLogs(query);
   }
 
-  @Get()
-  listOrders(@Query() query: ErpOrderQueryDto) {
-    return this.erpOrdersService.listOrders(query);
-  }
-
-  @Get(':orderSn')
-  getOrderDetail(
-    @Param('orderSn') orderSn: string,
-    @Query('shopId') shopId?: string,
-  ) {
-    return this.erpOrdersService.getOrderDetail(orderSn, shopId);
-  }
-
-  @Post(':orderSn/sync')
-  syncOrderDetail(
-    @Param('orderSn') orderSn: string,
-    @Body() payload: ErpOrderShopActionDto,
-  ) {
-    return this.erpOrdersService.syncOrderDetail(orderSn, payload);
-  }
-
-  @Get(':orderSn/escrow')
-  getEscrow(
-    @Param('orderSn') orderSn: string,
-    @Query() query: ErpOrderShopActionDto,
-  ) {
-    return this.erpOrdersService.getEscrow(orderSn, query);
-  }
-
   @Post('labels/print-task')
   createPrintTask(@Body() payload: ErpPrintLabelTaskDto) {
     return this.erpOrdersService.createPrintTask(payload);
@@ -85,6 +56,35 @@ export class ErpOrdersController {
   @Post('batch-mark-shipped')
   batchMarkShipped(@Body() payload: ErpBatchMarkShippedDto) {
     return this.erpOrdersService.batchMarkShipped(payload);
+  }
+
+  @Get()
+  listOrders(@Query() query: ErpOrderQueryDto) {
+    return this.erpOrdersService.listOrders(query);
+  }
+
+  @Get(':orderSn')
+  getOrderDetail(
+    @Param('orderSn') orderSn: string,
+    @Query('shopId') shopId?: string,
+  ) {
+    return this.erpOrdersService.getOrderDetail(orderSn, shopId);
+  }
+
+  @Post(':orderSn/sync')
+  syncOrderDetail(
+    @Param('orderSn') orderSn: string,
+    @Body() payload: ErpOrderShopActionDto,
+  ) {
+    return this.erpOrdersService.syncOrderDetail(orderSn, payload);
+  }
+
+  @Get(':orderSn/escrow')
+  getEscrow(
+    @Param('orderSn') orderSn: string,
+    @Query() query: ErpOrderShopActionDto,
+  ) {
+    return this.erpOrdersService.getEscrow(orderSn, query);
   }
 
   @Post(':orderSn/arrange-shipment')
