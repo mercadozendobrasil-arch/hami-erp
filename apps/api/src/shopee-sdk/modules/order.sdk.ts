@@ -59,7 +59,20 @@ export class OrderSdk {
       query: {
         order_sn_list: orderSn,
         response_optional_fields:
-          'buyer_user_id,buyer_username,item_list,total_amount,currency,order_status,payment_method,create_time,update_time,package_list,shipping_carrier,checkout_shipping_carrier,recipient_address,message_to_seller',
+          'buyer_user_id,buyer_username,item_list,total_amount,currency,order_status,payment_method,create_time,update_time,package_list,shipping_carrier,checkout_shipping_carrier,recipient_address,message_to_seller,invoice_data,payment_info',
+      },
+    });
+  }
+
+  async getEscrowDetail(
+    shopId: string,
+    orderSn: string,
+  ): Promise<ShopeeApiEnvelope<Record<string, unknown>>> {
+    return this.requestWithStoredToken(shopId, {
+      path: '/payment/get_escrow_detail',
+      method: 'GET',
+      query: {
+        order_sn: orderSn,
       },
     });
   }

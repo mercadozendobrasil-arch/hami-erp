@@ -6,12 +6,15 @@ import { OrderSdk } from 'src/shopee-sdk/modules/order.sdk';
 
 import {
   ErpFulfillmentStage,
+  ErpOrderLogQueryDto,
   ErpOrderQueryDto,
   ErpOrderStatusCountQueryDto,
 } from './dto/erp-order-query.dto';
 import {
   ErpBatchMarkReadyForPickupDto,
+  ErpBatchMarkShippedDto,
   ErpMarkReadyForPickupDto,
+  ErpOrderShopActionDto,
   ErpPrintLabelTaskDto,
 } from './dto/erp-order-action.dto';
 
@@ -107,6 +110,122 @@ export class ErpOrdersService {
     };
   }
 
+  async getOrderDetail(orderSn: string, shopId?: string) {
+    let projection = await this.findProjection(orderSn, shopId);
+
+    if (!projection && shopId) {
+      const detail = await this.pullOrderDetail(shopId, orderSn);
+      projection = await this.upsertProjectionFromOrder(shopId, detail);
+    }
+
+    if (!projection) {
+      throw new NotFoundException('ERP order projection not found. Provide shopId to pull from Shopee.');
+    }
+
+    return {
+      success: true,
+      data: this.toDetailItem(projection),
+    };
+  }
+
+  async syncOrderDetail(orderSn: string, payload: ErpOrderShopActionDto) {
+    const jobRecord = await this.createProcessingJob('sync-order-detail', {
+      shopId: payload.shopId,
+      orderSn,
+    });
+
+    try {
+      const detail = await this.pullOrderDetail(payload.shopId, orderSn);
+      const projection = await this.upsertProjectionFromOrder(payload.shopId, detail);
+      const result = {
+        totalNum: 1,
+        processedNum: 1,
+        successList: [{ orderSn, recordId: projection.id }],
+        failList: [],
+        recordId: projection.id,
+        status: projection.orderStatus,
+      };
+
+      await this.completeJob(jobRecord.id, result);
+      await this.recordOrderLog({
+        shopId: payload.shopId,
+        orderSn,
+        action: 'SYNC_ORDER_DETAIL',
+        status: 'SUCCESS',
+        jobRecordId: jobRecord.id,
+        request: payload,
+        response: result,
+      });
+
+      return {
+        success: true,
+        data: {
+          jobId: jobRecord.id,
+          ...result,
+        },
+      };
+    } catch (error) {
+      const message = this.errorMessage(error, 'Sync order detail failed.');
+      await this.failJob(jobRecord.id, message);
+      await this.recordOrderLog({
+        shopId: payload.shopId,
+        orderSn,
+        action: 'SYNC_ORDER_DETAIL',
+        status: 'FAILED',
+        jobRecordId: jobRecord.id,
+        request: payload,
+        errorMessage: message,
+      });
+      throw error;
+    }
+  }
+
+  async getEscrow(orderSn: string, payload: ErpOrderShopActionDto) {
+    const result = await this.orderSdk.getEscrowDetail(payload.shopId, orderSn);
+    await this.recordOrderLog({
+      shopId: payload.shopId,
+      orderSn,
+      action: 'GET_ESCROW_DETAIL',
+      status: 'SUCCESS',
+      request: payload,
+      response: result,
+    });
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  async listLogs(query: ErpOrderLogQueryDto) {
+    const current = query.current ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where: Prisma.ErpOrderOperationLogWhereInput = {
+      ...(query.shopId ? { shopId: query.shopId } : {}),
+      ...(query.orderSn ? { orderSn: query.orderSn } : {}),
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [total, data] = await this.prismaService.$transaction([
+      this.prismaService.erpOrderOperationLog.count({ where }),
+      this.prismaService.erpOrderOperationLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (current - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return {
+      success: true,
+      data,
+      total,
+      current,
+      pageSize,
+    };
+  }
+
   async createPrintTask(payload: ErpPrintLabelTaskDto) {
     const jobRecord = await this.prismaService.jobRecord.create({
       data: {
@@ -137,13 +256,20 @@ export class ErpOrdersService {
         payload.shopId,
         payload.orders,
       );
+      const normalizedResult = {
+        totalNum: payload.orders.length,
+        processedNum: payload.orders.length,
+        successList: payload.orders.map((order) => ({ orderSn: order.orderSn })),
+        failList: [],
+        raw: result,
+      };
 
       await this.prismaService.$transaction([
         this.prismaService.jobRecord.update({
           where: { id: jobRecord.id },
           data: {
             status: JobStatus.COMPLETED,
-            result: this.toJson(result),
+            result: this.toJson(normalizedResult),
             processedAt: new Date(),
           },
         }),
@@ -152,6 +278,20 @@ export class ErpOrdersService {
           data: { status: ErpLabelStatus.READY, result: this.toJson(result) },
         }),
       ]);
+
+      await Promise.all(
+        payload.orders.map((order) =>
+          this.recordOrderLog({
+            shopId: payload.shopId,
+            orderSn: order.orderSn,
+            action: 'CREATE_SHIPPING_DOCUMENT',
+            status: 'SUCCESS',
+            jobRecordId: jobRecord.id,
+            request: payload,
+            response: result,
+          }),
+        ),
+      );
 
       return {
         success: true,
@@ -162,13 +302,19 @@ export class ErpOrdersService {
         },
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Create shipping document failed.';
+      const message = this.errorMessage(error, 'Create shipping document failed.');
       await this.prismaService.$transaction([
         this.prismaService.jobRecord.update({
           where: { id: jobRecord.id },
           data: {
             status: JobStatus.FAILED,
             errorMessage: message,
+            result: this.toJson({
+              totalNum: payload.orders.length,
+              processedNum: 0,
+              successList: [],
+              failList: payload.orders.map((order) => ({ orderSn: order.orderSn, errorMessage: message })),
+            }),
             processedAt: new Date(),
           },
         }),
@@ -206,30 +352,84 @@ export class ErpOrdersService {
       },
     });
 
+    await this.recordOrderLog({
+      shopId: label.shopId,
+      orderSn: label.orderSn,
+      action: 'DOWNLOAD_SHIPPING_DOCUMENT',
+      status: 'SUCCESS',
+      jobRecordId: label.jobRecordId ?? undefined,
+      response: { labelId },
+    });
+
     return {
       file,
       filename: `${label.orderSn}-${label.packageNumber ?? 'label'}.pdf`,
     };
   }
 
-  async markReadyForPickup(orderSn: string, payload: ErpMarkReadyForPickupDto) {
-    const result = await this.orderSdk.shipOrder(payload.shopId, {
+  async arrangeShipment(orderSn: string, payload: ErpMarkReadyForPickupDto) {
+    const jobRecord = await this.createProcessingJob('arrange-shipment', {
+      shopId: payload.shopId,
       orderSn,
       packageNumber: payload.packageNumber,
-      pickup: payload.pickup,
-      dropoff: payload.dropoff,
-      nonIntegrated: payload.nonIntegrated,
     });
 
-    await this.upsertProjectionFromOrder(payload.shopId, {
-      order_sn: orderSn,
-      order_status: 'PROCESSED',
-      package_list: [
-        {
-          package_number: payload.packageNumber,
-          package_status: 'PROCESSED',
+    try {
+      const result = await this.shipOrderDirect(orderSn, payload);
+      const normalizedResult = {
+        totalNum: 1,
+        processedNum: 1,
+        successList: [{ orderSn, result }],
+        failList: [],
+      };
+      await this.completeJob(jobRecord.id, normalizedResult);
+      await this.recordOrderLog({
+        shopId: payload.shopId,
+        orderSn,
+        action: 'ARRANGE_SHIPMENT',
+        status: 'SUCCESS',
+        jobRecordId: jobRecord.id,
+        request: payload,
+        response: result,
+      });
+
+      return {
+        success: true,
+        data: {
+          jobId: jobRecord.id,
+          result,
         },
-      ],
+      };
+    } catch (error) {
+      const message = this.errorMessage(error, 'Arrange shipment failed.');
+      await this.failJob(jobRecord.id, message, {
+        totalNum: 1,
+        processedNum: 0,
+        successList: [],
+        failList: [{ orderSn, errorMessage: message }],
+      });
+      await this.recordOrderLog({
+        shopId: payload.shopId,
+        orderSn,
+        action: 'ARRANGE_SHIPMENT',
+        status: 'FAILED',
+        jobRecordId: jobRecord.id,
+        request: payload,
+        errorMessage: message,
+      });
+      throw error;
+    }
+  }
+
+  async markReadyForPickup(orderSn: string, payload: ErpMarkReadyForPickupDto) {
+    const result = await this.shipOrderDirect(orderSn, payload);
+    await this.recordOrderLog({
+      shopId: payload.shopId,
+      orderSn,
+      action: 'MARK_READY_FOR_PICKUP',
+      status: 'SUCCESS',
+      request: payload,
+      response: result,
     });
 
     return {
@@ -252,7 +452,7 @@ export class ErpOrdersService {
       } catch (error) {
         failList.push({
           orderSn: order.orderSn,
-          errorMessage: error instanceof Error ? error.message : 'Unknown ship_order error.',
+          errorMessage: this.errorMessage(error, 'Unknown ship_order error.'),
         });
       }
     }
@@ -262,6 +462,98 @@ export class ErpOrdersService {
       data: {
         successList,
         failList,
+      },
+    };
+  }
+
+  async batchArrangeShipment(payload: ErpBatchMarkReadyForPickupDto) {
+    const jobRecord = await this.createProcessingJob('batch-arrange-shipment', payload);
+    const successList: Array<{ orderSn: string; result: unknown }> = [];
+    const failList: Array<{ orderSn: string; errorMessage: string }> = [];
+
+    for (const order of payload.orders) {
+      try {
+        const result = await this.shipOrderDirect(order.orderSn, {
+          ...order,
+          shopId: payload.shopId,
+        });
+        successList.push({ orderSn: order.orderSn, result });
+      } catch (error) {
+        failList.push({
+          orderSn: order.orderSn,
+          errorMessage: this.errorMessage(error, 'Arrange shipment failed.'),
+        });
+      }
+    }
+
+    const result = {
+      totalNum: payload.orders.length,
+      processedNum: successList.length + failList.length,
+      successList,
+      failList,
+    };
+
+    if (failList.length) {
+      await this.failJob(jobRecord.id, 'Some orders failed to arrange shipment.', result);
+    } else {
+      await this.completeJob(jobRecord.id, result);
+    }
+
+    return {
+      success: failList.length === 0,
+      data: {
+        jobId: jobRecord.id,
+        ...result,
+      },
+    };
+  }
+
+  async batchMarkShipped(payload: ErpBatchMarkShippedDto) {
+    const jobRecord = await this.createProcessingJob('batch-mark-shipped', payload);
+    const successList: Array<{ orderSn: string; recordId: string }> = [];
+    const failList: Array<{ orderSn: string; errorMessage: string }> = [];
+
+    for (const orderSn of payload.orderSns) {
+      try {
+        const projection = await this.upsertProjectionFromOrder(payload.shopId, {
+          order_sn: orderSn,
+          order_status: 'SHIPPED',
+          update_time: Math.floor(Date.now() / 1000),
+        });
+        successList.push({ orderSn, recordId: projection.id });
+        await this.recordOrderLog({
+          shopId: payload.shopId,
+          orderSn,
+          action: 'BATCH_MARK_SHIPPED',
+          status: 'SUCCESS',
+          jobRecordId: jobRecord.id,
+          request: payload,
+          response: { recordId: projection.id },
+        });
+      } catch (error) {
+        const message = this.errorMessage(error, 'Mark shipped failed.');
+        failList.push({ orderSn, errorMessage: message });
+      }
+    }
+
+    const result = {
+      totalNum: payload.orderSns.length,
+      processedNum: successList.length + failList.length,
+      successList,
+      failList,
+    };
+
+    if (failList.length) {
+      await this.failJob(jobRecord.id, 'Some orders failed to mark shipped.', result);
+    } else {
+      await this.completeJob(jobRecord.id, result);
+    }
+
+    return {
+      success: failList.length === 0,
+      data: {
+        jobId: jobRecord.id,
+        ...result,
       },
     };
   }
@@ -289,6 +581,15 @@ export class ErpOrdersService {
     );
   }
 
+  private async pullOrderDetail(shopId: string, orderSn: string) {
+    const response = await this.orderSdk.getOrderDetail(shopId, orderSn);
+    const order = this.extractFirstOrder(response.response);
+    if (!order) {
+      throw new NotFoundException('Shopee order detail not found.');
+    }
+    return order;
+  }
+
   private extractOrderList(response: unknown): Record<string, unknown>[] {
     if (!response || typeof response !== 'object') return [];
     const record = response as Record<string, unknown>;
@@ -296,18 +597,34 @@ export class ErpOrdersService {
     return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
   }
 
+  private extractFirstOrder(response: unknown): Record<string, unknown> | undefined {
+    return this.extractOrderList(response)[0];
+  }
+
+  private async findProjection(orderSn: string, shopId?: string) {
+    return this.prismaService.erpOrderProjection.findFirst({
+      where: {
+        orderSn,
+        ...(shopId ? { shopId } : {}),
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
   private async upsertProjectionFromOrder(
     shopId: string,
     order: Record<string, unknown>,
   ) {
     const orderSn = String(order.order_sn ?? order.orderSn ?? '');
-    if (!orderSn) return;
+    if (!orderSn) {
+      throw new Error('Cannot upsert order projection without order_sn.');
+    }
 
     const orderStatus = String(order.order_status ?? order.orderStatus ?? 'UNKNOWN');
     const firstPackage = this.firstObject(order.package_list);
     const stage = this.resolveFulfillmentStage(orderStatus, firstPackage);
 
-    await this.prismaService.erpOrderProjection.upsert({
+    return this.prismaService.erpOrderProjection.upsert({
       where: {
         shopId_orderSn: {
           shopId,
@@ -352,6 +669,92 @@ export class ErpOrdersService {
     });
   }
 
+  private async shipOrderDirect(orderSn: string, payload: ErpMarkReadyForPickupDto) {
+    const result = await this.orderSdk.shipOrder(payload.shopId, {
+      orderSn,
+      packageNumber: payload.packageNumber,
+      pickup: payload.pickup ? this.asRecord(payload.pickup) : undefined,
+      dropoff: payload.dropoff ? this.asRecord(payload.dropoff) : undefined,
+      nonIntegrated: payload.nonIntegrated ? this.asRecord(payload.nonIntegrated) : undefined,
+    });
+
+    await this.upsertProjectionFromOrder(payload.shopId, {
+      order_sn: orderSn,
+      order_status: 'PROCESSED',
+      update_time: Math.floor(Date.now() / 1000),
+      package_list: [
+        {
+          package_number: payload.packageNumber,
+          package_status: 'PROCESSED',
+        },
+      ],
+    });
+
+    return result;
+  }
+
+  private async createProcessingJob(jobName: string, payload: unknown) {
+    return this.prismaService.jobRecord.create({
+      data: {
+        queueName: 'erp-orders',
+        jobName,
+        status: JobStatus.PROCESSING,
+        payload: this.toJson(payload),
+      },
+    });
+  }
+
+  private async completeJob(jobId: string, result: unknown) {
+    return this.prismaService.jobRecord.update({
+      where: { id: jobId },
+      data: {
+        status: JobStatus.COMPLETED,
+        result: this.toJson(result),
+        processedAt: new Date(),
+      },
+    });
+  }
+
+  private async failJob(jobId: string, errorMessage: string, result?: unknown) {
+    return this.prismaService.jobRecord.update({
+      where: { id: jobId },
+      data: {
+        status: JobStatus.FAILED,
+        errorMessage,
+        ...(result ? { result: this.toJson(result) } : {}),
+        processedAt: new Date(),
+      },
+    });
+  }
+
+  private async recordOrderLog(input: {
+    shopId?: string;
+    orderSn?: string;
+    action: string;
+    status: string;
+    message?: string;
+    jobRecordId?: string;
+    request?: unknown;
+    response?: unknown;
+    errorMessage?: string;
+    operatorId?: string;
+  }) {
+    return this.prismaService.erpOrderOperationLog.create({
+      data: {
+        shopId: input.shopId,
+        orderSn: input.orderSn,
+        action: input.action,
+        status: input.status,
+        message: input.message,
+        jobRecordId: input.jobRecordId,
+        request: input.request ? this.toJson(input.request) : undefined,
+        response: input.response ? this.toJson(input.response) : undefined,
+        errorMessage: input.errorMessage,
+        operatorId: input.operatorId,
+      },
+    });
+  }
+
   private resolveFulfillmentStage(
     orderStatus: string,
     firstPackage?: Record<string, unknown>,
@@ -372,6 +775,24 @@ export class ErpOrdersService {
     return first && typeof first === 'object'
       ? (first as Record<string, unknown>)
       : undefined;
+  }
+
+  private toDetailItem(item: Parameters<typeof this.toListItem>[0] & { raw?: Prisma.JsonValue | null }) {
+    const raw = this.asRecord(item.raw);
+    const detail = this.toListItem(item);
+    return {
+      ...detail,
+      raw,
+      buyerUserId: this.optionalString(raw.buyer_user_id) ?? detail.buyerUserId,
+      buyerName: this.optionalString(raw.buyer_username) ?? detail.buyerName,
+      messageToSeller: this.optionalString(raw.message_to_seller) ?? detail.messageToSeller,
+      paymentMethod: this.optionalString(raw.payment_method) ?? detail.paymentMethod,
+      recipientAddress: raw.recipient_address,
+      itemList: Array.isArray(raw.item_list) ? raw.item_list : [],
+      invoiceData: raw.invoice_data,
+      paymentInfo: raw.payment_info,
+      packageList: Array.isArray(raw.package_list) ? raw.package_list : detail.packageList,
+    };
   }
 
   private toListItem(item: {
@@ -537,6 +958,16 @@ export class ErpOrdersService {
     const value = Number(input);
     if (!Number.isFinite(value) || value <= 0) return undefined;
     return new Date(value * 1000);
+  }
+
+  private asRecord(input: unknown): Record<string, unknown> {
+    return input && typeof input === 'object' && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+  }
+
+  private errorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
   }
 
   private toJson(input: unknown): Prisma.InputJsonValue {

@@ -33,6 +33,11 @@ class ErpNonIntegratedDto {
   trackingNumber?: string;
 }
 
+export class ErpOrderShopActionDto {
+  @IsString()
+  shopId!: string;
+}
+
 export class ErpPrintLabelTaskItemDto {
   @IsString()
   orderSn!: string;
@@ -116,4 +121,15 @@ export class ErpBatchMarkReadyForPickupDto {
   @ValidateNested({ each: true })
   @Type(() => ErpBatchPickupItemDto)
   orders!: ErpBatchPickupItemDto[];
+}
+
+export class ErpBatchMarkShippedDto {
+  @IsString()
+  shopId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  orderSns!: string[];
 }

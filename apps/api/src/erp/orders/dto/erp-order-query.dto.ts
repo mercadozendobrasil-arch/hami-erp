@@ -43,3 +43,34 @@ export class ErpOrderStatusCountQueryDto {
   @IsString()
   shopId?: string;
 }
+
+export class ErpOrderLogQueryDto {
+  @IsOptional()
+  @IsString()
+  shopId?: string;
+
+  @IsOptional()
+  @IsString()
+  orderSn?: string;
+
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  current?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
