@@ -1,1 +1,0 @@
-C:/Program Files/PostgreSQL/18/bin/postgres.exe "-D" "C:/Users/hamim/.codex/worktrees/e59b/ant-design-pro/server/erp-api/.local-postgres/data" "-p" "5433" "-h" "localhost"
