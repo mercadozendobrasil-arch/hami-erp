@@ -93,6 +93,16 @@ model ErpOrderProjection {
   buyerUsername          String?
   totalAmount            Decimal?  @db.Decimal(18, 2)
   currency               String?
+  remark                 String?
+  locked                 Boolean   @default(false)
+  auditStatus            String    @default("PENDING")
+  warehouseName          String?
+  logisticsChannel       String?
+  tags                   Json?
+  afterSaleStatus        String    @default("NONE")
+  parentOrderSn          String?
+  mergedIntoOrderSn      String?
+  splitGroupId           String?
   createTime             DateTime?
   updateTime             DateTime?
   raw                    Json?
@@ -104,6 +114,11 @@ model ErpOrderProjection {
   @@index([shopId, fulfillmentStage])
   @@index([shopId, orderStatus])
   @@index([shopId, shippingDocumentStatus])
+  @@index([shopId, auditStatus])
+  @@index([shopId, locked])
+  @@index([shopId, afterSaleStatus])
+  @@index([shopId, warehouseName])
+  @@index([splitGroupId])
   @@index([updateTime])
 }
 
