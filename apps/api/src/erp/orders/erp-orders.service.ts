@@ -673,9 +673,9 @@ export class ErpOrdersService {
     const result = await this.orderSdk.shipOrder(payload.shopId, {
       orderSn,
       packageNumber: payload.packageNumber,
-      pickup: payload.pickup,
-      dropoff: payload.dropoff,
-      nonIntegrated: payload.nonIntegrated,
+      pickup: payload.pickup ? this.asRecord(payload.pickup) : undefined,
+      dropoff: payload.dropoff ? this.asRecord(payload.dropoff) : undefined,
+      nonIntegrated: payload.nonIntegrated ? this.asRecord(payload.nonIntegrated) : undefined,
     });
 
     await this.upsertProjectionFromOrder(payload.shopId, {

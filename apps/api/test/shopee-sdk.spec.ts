@@ -54,6 +54,7 @@ describe('Shopee SDK self-hosted client', () => {
     const config = {
       baseUrl: 'https://partner.test-stable.shopeemobile.com',
       environment: 'sandbox' as const,
+      apiVersion: 'v2',
       partnerId: 1001,
       partnerKey: 'sandbox-key',
       timeoutMs: 1000,

@@ -47,7 +47,9 @@ export class ShopeeEnvironmentResolver {
     }
 
     if (env === 'production') {
-      return 'production';
+      return this.hasRequiredEnvironmentConfig('production')
+        ? 'production'
+        : 'sandbox';
     }
 
     throw new InternalServerErrorException(
@@ -62,6 +64,14 @@ export class ShopeeEnvironmentResolver {
     return env === 'production'
       ? `SHOPEE_PROD_${key}`
       : `SHOPEE_SANDBOX_${key}`;
+  }
+
+  private hasRequiredEnvironmentConfig(env: ShopeeEnvironment): boolean {
+    return (
+      !!this.configService.get<string>(this.getEnvKey(env, 'PARTNER_ID')) &&
+      !!this.configService.get<string>(this.getEnvKey(env, 'PARTNER_KEY')) &&
+      !!this.configService.get<string>(this.getEnvKey(env, 'REDIRECT_URL'))
+    );
   }
 
   private getRequiredNumber(key: string): number {
