@@ -107,6 +107,26 @@ model ErpOrderProjection {
   @@index([updateTime])
 }
 
+model ErpOrderOperationLog {
+  id           String   @id @default(cuid())
+  shopId       String?
+  orderSn      String?
+  action       String
+  status       String
+  message      String?
+  jobRecordId  String?
+  request      Json?
+  response     Json?
+  errorMessage String?
+  operatorId   String?
+  createdAt    DateTime @default(now())
+
+  @@index([shopId, orderSn])
+  @@index([action, status])
+  @@index([jobRecordId])
+  @@index([createdAt])
+}
+
 model ErpShippingLabelRecord {
   id                   String         @id @default(cuid())
   shopId               String
