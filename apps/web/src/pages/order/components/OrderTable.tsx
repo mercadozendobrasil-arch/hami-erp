@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createLivePrintLabelTask,
   batchMarkLiveOrdersReadyForPickup,
+  downloadLiveLabel,
 } from '@/services/erp/orderLive';
 import {
   AFTER_SALE_STATUS_OPTIONS,
@@ -108,9 +109,24 @@ const OrderTable: React.FC<OrderTableProps> = ({
         })),
       });
       hide();
-      messageApi.success(
-        `面单任务已创建：${response.data.labelIds.length} 个面单，Job ${response.data.jobId}`,
-      );
+      if (response.data.labelIds.length === 1) {
+        try {
+          await downloadLiveLabel(response.data.labelIds[0]);
+          messageApi.success(
+            `面单任务已创建并开始下载，Job ${response.data.jobId}`,
+          );
+        } catch (downloadError) {
+          messageApi.warning(
+            downloadError instanceof Error
+              ? `面单任务已创建，但下载失败：${downloadError.message}`
+              : '面单任务已创建，但下载失败',
+          );
+        }
+      } else {
+        messageApi.success(
+          `面单任务已创建：${response.data.labelIds.length} 个面单，Job ${response.data.jobId}`,
+        );
+      }
       actionRef.current?.reload();
     } catch (error) {
       hide();
