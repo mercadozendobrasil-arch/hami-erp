@@ -7,6 +7,7 @@ export const ERP_FULFILLMENT_STAGES = [
   'pending_print',
   'pending_pickup',
   'shipped',
+  'cancelled',
 ] as const;
 
 export type ErpFulfillmentStage = (typeof ERP_FULFILLMENT_STAGES)[number];

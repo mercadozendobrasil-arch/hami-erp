@@ -5,7 +5,8 @@ export type LiveFulfillmentStage =
   | 'pending_shipment'
   | 'pending_print'
   | 'pending_pickup'
-  | 'shipped';
+  | 'shipped'
+  | 'cancelled';
 
 export type LiveOrderStatusCounts = {
   pendingInvoice: number;
@@ -13,6 +14,7 @@ export type LiveOrderStatusCounts = {
   pendingPrint: number;
   pendingPickup: number;
   shipped: number;
+  cancelled: number;
   total: number;
 };
 
@@ -92,6 +94,56 @@ export async function createLivePrintLabelTask(payload: LivePrintLabelTaskPayloa
     method: 'POST',
     data: payload,
   });
+}
+
+function resolveErpAuthHeaders() {
+  const token = process.env.UMI_APP_ERP_API_TOKEN;
+
+  return token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : undefined;
+}
+
+function resolveFilenameFromDisposition(headerValue: string | null, fallback: string) {
+  if (!headerValue) {
+    return fallback;
+  }
+
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const basicMatch = headerValue.match(/filename="?([^"]+)"?/i);
+  return basicMatch?.[1] || fallback;
+}
+
+export async function downloadLiveLabel(labelId: string) {
+  const response = await fetch(`/api/erp/orders/labels/${labelId}/download`, {
+    method: 'GET',
+    headers: resolveErpAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`下载面单失败，状态码 ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const filename = resolveFilenameFromDisposition(
+    response.headers.get('content-disposition'),
+    `shipping-label-${labelId}.pdf`,
+  );
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
 }
 
 export function getLiveLabelDownloadUrl(labelId?: string) {

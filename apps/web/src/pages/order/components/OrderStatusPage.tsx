@@ -27,6 +27,7 @@ const TAB_TO_FULFILLMENT_STAGE: Record<string, LiveFulfillmentStage | undefined>
   pendingPrint: 'pending_print',
   pendingPickup: 'pending_pickup',
   shipped: 'shipped',
+  cancelRefund: 'cancelled',
 };
 
 const OrderStatusPage: React.FC<OrderStatusPageProps> = ({

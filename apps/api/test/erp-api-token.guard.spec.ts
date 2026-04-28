@@ -71,7 +71,8 @@ describe('ErpApiTokenGuard', () => {
     );
 
     expect(() => guard.canActivate(createContext('Bearer wrong-token'))).toThrow(
-      UnauthorizedException);
+      UnauthorizedException,
+    );
     expect(() => guard.canActivate(createContext('Basic secret-token'))).toThrow(
       'Invalid ERP API bearer token.',
     );

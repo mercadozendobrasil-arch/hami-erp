@@ -31,6 +31,7 @@ function normalizeLiveOverview(
     logisticsPendingCount: counts?.pendingPickup ?? 0,
     processedCount: counts?.pendingPickup ?? 0,
     shippedCount: counts?.shipped ?? 0,
+    cancelledCount: counts?.cancelled ?? 0,
   };
 }
 
