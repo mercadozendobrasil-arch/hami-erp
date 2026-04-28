@@ -56,6 +56,13 @@ export class ProductAiMediaService {
     });
   }
 
+  getAssetVersions(assetId: string) {
+    return this.prisma.productAiAssetVersion.findMany({
+      where: { assetId },
+      orderBy: { versionNo: 'desc' },
+    });
+  }
+
   listTasks(productId: string, tenantId = 'default') {
     return this.prisma.productAiTask.findMany({
       where: { productId, tenantId },
