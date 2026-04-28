@@ -99,6 +99,34 @@ npm install
 npm start
 ```
 
+### ERP API Token 配置
+
+前端访问 `/api/erp/*` 时会从环境变量里读取 Bearer Token。
+
+建议按角色拆成这几组变量：
+
+```dotenv
+UMI_APP_ERP_VIEWER_TOKEN=
+UMI_APP_ERP_OPERATOR_TOKEN=
+UMI_APP_ERP_ADMIN_TOKEN=
+UMI_APP_ERP_API_TOKEN=
+```
+
+推荐使用方式：
+
+1. 在部署密钥里分别保存 `viewer`、`operator`、`admin` 三种 token。
+2. 当前前端部署只把需要的那个角色 token 映射给 `UMI_APP_ERP_API_TOKEN`。
+3. 只读看板不要直接下发 `admin` token。
+
+示例：
+
+```dotenv
+UMI_APP_ERP_VIEWER_TOKEN=replace-viewer-token
+UMI_APP_ERP_OPERATOR_TOKEN=replace-operator-token
+UMI_APP_ERP_ADMIN_TOKEN=replace-admin-token
+UMI_APP_ERP_API_TOKEN=replace-operator-token
+```
+
 ### 精简为简单版本
 
 本项目默认包含所有区块。如果你需要一个最小化的版本，运行：

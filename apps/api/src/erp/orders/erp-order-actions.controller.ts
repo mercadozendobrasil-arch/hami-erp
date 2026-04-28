@@ -1,4 +1,8 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+import { RequireErpPermissions } from 'src/common/auth/erp-permissions.decorator';
+import { ErpApiTokenGuard } from 'src/common/guards/erp-api-token.guard';
 
 import {
   ErpOrderAfterSaleDto,
@@ -14,6 +18,10 @@ import {
 } from './dto/erp-order-action.dto';
 import { ErpOrderActionsService } from './erp-order-actions.service';
 
+@ApiTags('erp-orders-actions')
+@ApiBearerAuth()
+@UseGuards(ErpApiTokenGuard)
+@RequireErpPermissions('erp.write')
 @Controller('erp/orders')
 export class ErpOrderActionsController {
   constructor(private readonly erpOrderActionsService: ErpOrderActionsService) {}

@@ -126,17 +126,8 @@ export class WebhooksService {
       );
     }
 
-    await this.prismaService.webhookEvent.update({
-      where: {
-        id: webhookEventId,
-      },
-      data: {
-        status: WebhookStatus.PROCESSED,
-        processedAt: new Date(),
-      },
-    });
-
     if (!webhookEvent.topic.toLowerCase().includes('order')) {
+      await this.markProcessed(webhookEventId);
       return {
         handled: true,
         routedTo: null,
@@ -154,6 +145,7 @@ export class WebhooksService {
       this.pickString(payload, ['shop_id', 'shopId', 'shopid']);
 
     if (!orderSn || !shopId) {
+      await this.markProcessed(webhookEventId);
       return {
         handled: true,
         routedTo: null,
@@ -197,10 +189,24 @@ export class WebhooksService {
       },
     });
 
+    await this.markProcessed(webhookEventId);
+
     return {
       handled: true,
       routedTo: ORDER_SYNC_QUEUE,
     };
+  }
+
+  private async markProcessed(webhookEventId: string) {
+    await this.prismaService.webhookEvent.update({
+      where: {
+        id: webhookEventId,
+      },
+      data: {
+        status: WebhookStatus.PROCESSED,
+        processedAt: new Date(),
+      },
+    });
   }
 
   private pickString(

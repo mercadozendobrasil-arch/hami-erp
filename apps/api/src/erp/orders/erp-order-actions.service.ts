@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from 'src/infra/database/prisma.service';
@@ -31,11 +31,16 @@ export class ErpOrderActionsService {
       orderSn,
       payload.remark,
     );
-    const projection = await this.upsertManualState(payload.shopId, orderSn, {
-      remark: payload.remark,
-    });
+    const projection = await this.upsertManualState(
+      this.prismaService,
+      payload.shopId,
+      orderSn,
+      {
+        remark: payload.remark,
+      },
+    );
 
-    await this.recordOrderLog({
+    await this.recordOrderLog(this.prismaService, {
       shopId: payload.shopId,
       orderSn,
       action: 'UPDATE_NOTE',
@@ -73,12 +78,17 @@ export class ErpOrderActionsService {
       orderSn,
       payload.cancelReason,
     );
-    const projection = await this.upsertManualState(payload.shopId, orderSn, {
-      orderStatus: 'CANCELLED',
-      fulfillmentStage: 'pending_shipment',
-    });
+    const projection = await this.upsertManualState(
+      this.prismaService,
+      payload.shopId,
+      orderSn,
+      {
+        orderStatus: 'CANCELLED',
+        fulfillmentStage: 'cancelled',
+      },
+    );
 
-    await this.recordOrderLog({
+    await this.recordOrderLog(this.prismaService, {
       shopId: payload.shopId,
       orderSn,
       action: 'CANCEL_ORDER',
@@ -132,67 +142,97 @@ export class ErpOrderActionsService {
   }
 
   async splitOrder(orderSn: string, payload: ErpOrderSplitDto) {
-    const splitGroupId = payload.splitGroupId || `split-${orderSn}-${Date.now()}`;
-    const parent = await this.upsertManualState(payload.shopId, orderSn, {
-      splitGroupId,
-    });
+    this.assertNoSelfReference(orderSn, payload.childOrderSns, 'childOrderSns');
+    this.assertUniqueOrderSns(payload.childOrderSns, 'childOrderSns');
 
-    const children = await Promise.all(
-      payload.childOrderSns.map((childOrderSn) =>
-        this.upsertManualState(payload.shopId, childOrderSn, {
-          parentOrderSn: orderSn,
+    return this.prismaService.$transaction(async (tx) => {
+      const splitGroupId = payload.splitGroupId || `split-${orderSn}-${Date.now()}`;
+      const parent = await this.upsertManualState(
+        tx,
+        payload.shopId,
+        orderSn,
+        {
           splitGroupId,
-        }),
-      ),
-    );
+        },
+      );
 
-    const response = {
-      parentOrderSn: orderSn,
-      splitGroupId,
-      childOrderSns: payload.childOrderSns,
-      parentId: parent.id,
-      childIds: children.map((child) => child.id),
-    };
+      const children = await Promise.all(
+        payload.childOrderSns.map((childOrderSn) =>
+          this.upsertManualState(tx, payload.shopId, childOrderSn, {
+            parentOrderSn: orderSn,
+            splitGroupId,
+            mergedIntoOrderSn: null,
+          }),
+        ),
+      );
 
-    await this.recordOrderLog({
-      shopId: payload.shopId,
-      orderSn,
-      action: 'SPLIT_ORDER',
-      status: 'SUCCESS',
-      request: payload,
-      response,
+      const response = {
+        parentOrderSn: orderSn,
+        splitGroupId,
+        childOrderSns: payload.childOrderSns,
+        parentId: parent.id,
+        childIds: children.map((child) => child.id),
+      };
+
+      await this.recordOrderLog(tx, {
+        shopId: payload.shopId,
+        orderSn,
+        action: 'SPLIT_ORDER',
+        status: 'SUCCESS',
+        request: payload,
+        response,
+      });
+
+      return this.success(response);
     });
-
-    return this.success(response);
   }
 
   async mergeOrders(payload: ErpOrderMergeDto) {
-    const target = await this.upsertManualState(payload.shopId, payload.targetOrderSn, {});
-    const sources = await Promise.all(
-      payload.sourceOrderSns.map((sourceOrderSn) =>
-        this.upsertManualState(payload.shopId, sourceOrderSn, {
-          mergedIntoOrderSn: payload.targetOrderSn,
-        }),
-      ),
+    this.assertNoSelfReference(
+      payload.targetOrderSn,
+      payload.sourceOrderSns,
+      'sourceOrderSns',
     );
+    this.assertUniqueOrderSns(payload.sourceOrderSns, 'sourceOrderSns');
 
-    const response = {
-      targetOrderSn: payload.targetOrderSn,
-      sourceOrderSns: payload.sourceOrderSns,
-      targetId: target.id,
-      sourceIds: sources.map((source) => source.id),
-    };
+    return this.prismaService.$transaction(async (tx) => {
+      const target = await this.upsertManualState(
+        tx,
+        payload.shopId,
+        payload.targetOrderSn,
+        {
+          parentOrderSn: null,
+          mergedIntoOrderSn: null,
+        },
+      );
+      const sources = await Promise.all(
+        payload.sourceOrderSns.map((sourceOrderSn) =>
+          this.upsertManualState(tx, payload.shopId, sourceOrderSn, {
+            mergedIntoOrderSn: payload.targetOrderSn,
+            parentOrderSn: null,
+            splitGroupId: null,
+          }),
+        ),
+      );
 
-    await this.recordOrderLog({
-      shopId: payload.shopId,
-      orderSn: payload.targetOrderSn,
-      action: 'MERGE_ORDERS',
-      status: 'SUCCESS',
-      request: payload,
-      response,
+      const response = {
+        targetOrderSn: payload.targetOrderSn,
+        sourceOrderSns: payload.sourceOrderSns,
+        targetId: target.id,
+        sourceIds: sources.map((source) => source.id),
+      };
+
+      await this.recordOrderLog(tx, {
+        shopId: payload.shopId,
+        orderSn: payload.targetOrderSn,
+        action: 'MERGE_ORDERS',
+        status: 'SUCCESS',
+        request: payload,
+        response,
+      });
+
+      return this.success(response);
     });
-
-    return this.success(response);
   }
 
   private async setLockState(
@@ -217,9 +257,14 @@ export class ErpOrderActionsService {
     action: string,
     data: Prisma.ErpOrderProjectionUpdateInput,
   ) {
-    const projection = await this.upsertManualState(payload.shopId, orderSn, data);
+    const projection = await this.upsertManualState(
+      this.prismaService,
+      payload.shopId,
+      orderSn,
+      data,
+    );
 
-    await this.recordOrderLog({
+    await this.recordOrderLog(this.prismaService, {
       shopId: payload.shopId,
       orderSn,
       action,
@@ -232,11 +277,12 @@ export class ErpOrderActionsService {
   }
 
   private async upsertManualState(
+    prisma: PrismaClientDelegate,
     shopId: string,
     orderSn: string,
     data: Prisma.ErpOrderProjectionUpdateInput,
   ) {
-    return this.prismaService.erpOrderProjection.upsert({
+    return prisma.erpOrderProjection.upsert({
       where: {
         shopId_orderSn: {
           shopId,
@@ -298,7 +344,7 @@ export class ErpOrderActionsService {
     });
   }
 
-  private async recordOrderLog(input: {
+  private async recordOrderLog(prisma: PrismaClientDelegate, input: {
     shopId?: string;
     orderSn?: string;
     action: string;
@@ -310,7 +356,7 @@ export class ErpOrderActionsService {
     errorMessage?: string;
     operatorId?: string;
   }) {
-    return this.prismaService.erpOrderOperationLog.create({
+    return prisma.erpOrderOperationLog.create({
       data: {
         shopId: input.shopId,
         orderSn: input.orderSn,
@@ -324,6 +370,30 @@ export class ErpOrderActionsService {
         operatorId: input.operatorId,
       },
     });
+  }
+
+  private assertNoSelfReference(
+    targetOrderSn: string,
+    relatedOrderSns: string[],
+    fieldName: string,
+  ) {
+    if (relatedOrderSns.includes(targetOrderSn)) {
+      throw new BadRequestException(
+        `${fieldName} cannot include the primary order number.`,
+      );
+    }
+  }
+
+  private assertUniqueOrderSns(orderSns: string[], fieldName: string) {
+    const duplicates = orderSns.filter(
+      (orderSn, index) => orderSns.indexOf(orderSn) !== index,
+    );
+
+    if (duplicates.length > 0) {
+      throw new BadRequestException(
+        `Duplicate order numbers are not allowed in ${fieldName}.`,
+      );
+    }
   }
 
   private success<T>(data: T) {
@@ -353,3 +423,8 @@ export class ErpOrderActionsService {
     return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
   }
 }
+
+type PrismaClientDelegate = {
+  erpOrderProjection: PrismaService['erpOrderProjection'];
+  erpOrderOperationLog: PrismaService['erpOrderOperationLog'];
+};

@@ -24,6 +24,7 @@ const STAGE_TO_SHOPEE_STATUS: Record<ErpFulfillmentStage, string> = {
   pending_print: 'READY_TO_SHIP',
   pending_pickup: 'PROCESSED',
   shipped: 'SHIPPED',
+  cancelled: 'CANCELLED',
 };
 
 const DEFAULT_RESPONSE_FIELDS =
@@ -57,6 +58,7 @@ export class ErpOrdersService {
       pendingPrint: 0,
       pendingPickup: 0,
       shipped: 0,
+      cancelled: 0,
       total: 0,
     };
 
@@ -68,6 +70,7 @@ export class ErpOrdersService {
       if (item.fulfillmentStage === 'pending_print') counts.pendingPrint = count;
       if (item.fulfillmentStage === 'pending_pickup') counts.pendingPickup = count;
       if (item.fulfillmentStage === 'shipped') counts.shipped = count;
+      if (item.fulfillmentStage === 'cancelled') counts.cancelled = count;
     }
 
     return {
@@ -759,6 +762,7 @@ export class ErpOrdersService {
     orderStatus: string,
     firstPackage?: Record<string, unknown>,
   ): ErpFulfillmentStage {
+    if (orderStatus === 'CANCELLED') return 'cancelled';
     if (orderStatus === 'SHIPPED') return 'shipped';
     if (orderStatus === 'PROCESSED') return 'pending_pickup';
     if (orderStatus !== 'READY_TO_SHIP') return 'pending_shipment';
