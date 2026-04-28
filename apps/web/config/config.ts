@@ -30,6 +30,7 @@ export default defineConfig({
   hash: true,
 
   publicPath: PUBLIC_PATH,
+  esbuildMinifyIIFE: true,
 
   /**
    * @name 兼容性设置
