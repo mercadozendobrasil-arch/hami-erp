@@ -44,9 +44,10 @@ export function toPrismaUsageType(value: string) {
 }
 
 export function inferAssetType(taskType: string) {
-  if (taskType === 'main_image_optimize') return 'MAIN_IMAGE';
-  if (taskType === 'scene_image') return 'SCENE_IMAGE';
-  if (taskType === 'detail_content_image') return 'DETAIL_IMAGE';
+  const normalized = taskType.toLowerCase();
+  if (normalized === 'main_image_optimize') return 'MAIN_IMAGE';
+  if (normalized === 'scene_image') return 'SCENE_IMAGE';
+  if (normalized === 'detail_content_image') return 'DETAIL_IMAGE';
   return 'POSTER';
 }
 
