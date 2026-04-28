@@ -96,6 +96,34 @@ npm install
 npm start
 ```
 
+### ERP API Tokens
+
+ERP requests under `/api/erp/*` use a bearer token from the frontend environment.
+
+Recommended variables:
+
+```dotenv
+UMI_APP_ERP_VIEWER_TOKEN=
+UMI_APP_ERP_OPERATOR_TOKEN=
+UMI_APP_ERP_ADMIN_TOKEN=
+UMI_APP_ERP_API_TOKEN=
+```
+
+Recommended usage:
+
+1. Store separate viewer/operator/admin tokens in deployment secrets.
+2. Set `UMI_APP_ERP_API_TOKEN` to the one role token that matches the current frontend surface.
+3. Avoid shipping an admin token to read-only dashboards.
+
+Example:
+
+```dotenv
+UMI_APP_ERP_VIEWER_TOKEN=replace-viewer-token
+UMI_APP_ERP_OPERATOR_TOKEN=replace-operator-token
+UMI_APP_ERP_ADMIN_TOKEN=replace-admin-token
+UMI_APP_ERP_API_TOKEN=replace-operator-token
+```
+
 ### Simplify to Simple Version
 
 This project includes all blocks by default. If you need a minimal version, run:

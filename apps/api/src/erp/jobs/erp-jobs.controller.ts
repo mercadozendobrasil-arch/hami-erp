@@ -1,7 +1,15 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+import { RequireErpPermissions } from 'src/common/auth/erp-permissions.decorator';
+import { ErpApiTokenGuard } from 'src/common/guards/erp-api-token.guard';
 
 import { ErpJobsService } from './erp-jobs.service';
 
+@ApiTags('erp-jobs')
+@ApiBearerAuth()
+@UseGuards(ErpApiTokenGuard)
+@RequireErpPermissions('erp.jobs.read')
 @Controller('erp')
 export class ErpJobsController {
   constructor(private readonly erpJobsService: ErpJobsService) {}

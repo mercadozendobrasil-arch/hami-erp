@@ -17,12 +17,14 @@ import { ProductsModule } from './modules/products/products.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ShopeeSdkModule } from './shopee-sdk/shopee-sdk.module';
+import { validateErpApiAccessConfig } from './common/auth/erp-api-access.util';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateErpApiAccessConfig,
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],

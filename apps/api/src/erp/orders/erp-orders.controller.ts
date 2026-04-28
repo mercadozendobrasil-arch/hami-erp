@@ -1,4 +1,18 @@
-import { Body, Controller, Get, Header, Param, Post, Query, StreamableFile } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+import { RequireErpPermissions } from 'src/common/auth/erp-permissions.decorator';
+import { ErpApiTokenGuard } from 'src/common/guards/erp-api-token.guard';
 
 import {
   ErpOrderLogQueryDto,
@@ -14,6 +28,10 @@ import {
 } from './dto/erp-order-action.dto';
 import { ErpOrdersService } from './erp-orders.service';
 
+@ApiTags('erp-orders')
+@ApiBearerAuth()
+@UseGuards(ErpApiTokenGuard)
+@RequireErpPermissions('erp.read')
 @Controller('erp/orders')
 export class ErpOrdersController {
   constructor(private readonly erpOrdersService: ErpOrdersService) {}
@@ -29,6 +47,7 @@ export class ErpOrdersController {
   }
 
   @Post('labels/print-task')
+  @RequireErpPermissions('erp.write')
   createPrintTask(@Body() payload: ErpPrintLabelTaskDto) {
     return this.erpOrdersService.createPrintTask(payload);
   }
@@ -44,16 +63,19 @@ export class ErpOrdersController {
   }
 
   @Post('batch-arrange-shipment')
+  @RequireErpPermissions('erp.write')
   batchArrangeShipment(@Body() payload: ErpBatchMarkReadyForPickupDto) {
     return this.erpOrdersService.batchArrangeShipment(payload);
   }
 
   @Post('batch-mark-ready-for-pickup')
+  @RequireErpPermissions('erp.write')
   batchMarkReadyForPickup(@Body() payload: ErpBatchMarkReadyForPickupDto) {
     return this.erpOrdersService.batchMarkReadyForPickup(payload);
   }
 
   @Post('batch-mark-shipped')
+  @RequireErpPermissions('erp.write')
   batchMarkShipped(@Body() payload: ErpBatchMarkShippedDto) {
     return this.erpOrdersService.batchMarkShipped(payload);
   }
@@ -72,6 +94,7 @@ export class ErpOrdersController {
   }
 
   @Post(':orderSn/sync')
+  @RequireErpPermissions('erp.write')
   syncOrderDetail(
     @Param('orderSn') orderSn: string,
     @Body() payload: ErpOrderShopActionDto,
@@ -88,6 +111,7 @@ export class ErpOrdersController {
   }
 
   @Post(':orderSn/arrange-shipment')
+  @RequireErpPermissions('erp.write')
   arrangeShipment(
     @Param('orderSn') orderSn: string,
     @Body() payload: ErpMarkReadyForPickupDto,
@@ -96,6 +120,7 @@ export class ErpOrdersController {
   }
 
   @Post(':orderSn/mark-ready-for-pickup')
+  @RequireErpPermissions('erp.write')
   markReadyForPickup(
     @Param('orderSn') orderSn: string,
     @Body() payload: ErpMarkReadyForPickupDto,
