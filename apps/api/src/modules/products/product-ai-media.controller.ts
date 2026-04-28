@@ -109,7 +109,7 @@ export class ProductAiMediaController {
 
   @Get('ai/product/assets/:assetId/versions')
   getAssetVersions(@Param('assetId') assetId: string) {
-    return this.productAiMediaService.listAssets(assetId);
+    return this.productAiMediaService.getAssetVersions(assetId);
   }
 
   @Post('ai/product/assets/:assetId/versions/:versionId/switch')
