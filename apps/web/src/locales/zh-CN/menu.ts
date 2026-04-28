@@ -57,8 +57,6 @@ export default {
   'menu.product': '商品中心',
   'menu.product.product-list': '商品列表',
   'menu.order': '订单中心',
-  'menu.order.order-list': '订单列表',
-  'menu.order.all-orders': '全部订单',
   'menu.order.pending-orders': '待处理订单',
   'menu.order.pending-audit-orders': '待审核订单',
   'menu.order.pending-shipment-orders': '待发货订单',
