@@ -5,9 +5,6 @@ export async function getShopeeAuthUrl() {
     ERP.ShopeeAuthUrlResponse & { authorizationUrl?: string; redirectUri?: string }
   >('/api/shopee/auth/authorize-url', {
     method: 'POST',
-    data: {
-      redirectUri: `${window.location.origin}/shop/auth`,
-    },
   });
 
   return {
