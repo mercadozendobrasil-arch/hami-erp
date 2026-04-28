@@ -1,6 +1,5 @@
 import {
   CloseOutlined,
-  PlusOutlined,
   SaveOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
@@ -13,9 +12,10 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { history, useLocation } from '@umijs/max';
-import { Button, Card, Empty, message, Space, Typography, Upload } from 'antd';
+import { history, useLocation, useParams } from '@umijs/max';
+import { Button, Card, Empty, message, Space, Typography } from 'antd';
 import React, { useMemo } from 'react';
+import ProductMediaCenter from '../components/ProductMediaCenter';
 import './style.less';
 
 const sectionStyle = { marginBottom: 16 };
@@ -23,10 +23,14 @@ const sectionStyle = { marginBottom: 16 };
 const ProductCreatePage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const location = useLocation();
-  const shopId = useMemo(
-    () => new URLSearchParams(location.search).get('shopId') || undefined,
+  const params = useParams<{ id?: string }>();
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
     [location.search],
   );
+  const shopId = searchParams.get('shopId') || undefined;
+  const productId = params.id || searchParams.get('productId') || `draft-${shopId}`;
+  const isEdit = Boolean(params.id);
 
   if (!shopId) {
     return (
@@ -43,8 +47,10 @@ const ProductCreatePage: React.FC = () => {
   return (
     <PageContainer
       className="erp-product-create"
-      title="创建产品"
-      breadcrumb={{ items: [{ title: 'Shopee' }, { title: '创建产品' }] }}
+      title={isEdit ? '编辑产品' : '创建产品'}
+      breadcrumb={{
+        items: [{ title: 'Shopee' }, { title: isEdit ? '编辑产品' : '创建产品' }],
+      }}
       extra={[
         <Button
           key="close"
@@ -170,17 +176,7 @@ const ProductCreatePage: React.FC = () => {
             </Card>
 
             <Card id="media" title="媒体文件" style={sectionStyle}>
-              <ProForm.Item label="产品图片" required>
-                <Upload listType="picture-card" beforeUpload={() => false}>
-                  <button type="button">
-                    <PlusOutlined />
-                    <div style={{ marginTop: 8 }}>添加图片</div>
-                  </button>
-                </Upload>
-                <Typography.Text type="secondary">
-                  最多上传9张图片，仅支持 JPG、JPEG、PNG。
-                </Typography.Text>
-              </ProForm.Item>
+              <ProductMediaCenter productId={productId} />
             </Card>
 
             <Card id="logistics" title="物流" style={sectionStyle}>

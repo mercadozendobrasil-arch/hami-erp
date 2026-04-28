@@ -34,6 +34,72 @@ enum ErpLabelStatus {
   DOWNLOADED
 }
 
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+  ATTACHMENT
+}
+
+enum ProductMediaSourceType {
+  ORIGINAL
+  PRODUCT
+  SKU
+  AI
+}
+
+enum ProductAiTaskType {
+  POSTER_BATCH
+  MAIN_IMAGE_OPTIMIZE
+  SCENE_IMAGE
+  DETAIL_CONTENT_IMAGE
+  FULL_EDIT
+  PARTIAL_EDIT
+}
+
+enum ProductAiTaskStatus {
+  CREATED
+  QUEUED
+  PROCESSING
+  RENDERING
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+enum ProductAiAssetType {
+  POSTER
+  MAIN_IMAGE
+  SCENE_IMAGE
+  DETAIL_IMAGE
+}
+
+enum ProductAiAssetAuditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductAiAssetPublishStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProductAiAssetVersionType {
+  INITIAL
+  REGENERATE
+  FULL_EDIT
+  PARTIAL_EDIT
+}
+
+enum ProductMediaUsageType {
+  PRODUCT_MAIN
+  PRODUCT_DETAIL
+  MARKETING_MATERIAL
+  CHANNEL_PUBLISH
+}
+
 model ShopeeShop {
   id          String          @id @default(cuid())
   shopId      BigInt          @unique
@@ -174,4 +240,114 @@ model WebhookEvent {
   updatedAt   DateTime       @updatedAt
 
   @@index([shopRef, status])
+}
+
+model ProductMedia {
+  id           String                 @id @default(cuid())
+  tenantId     String
+  productId    String
+  mediaType    ProductMediaType
+  sourceType   ProductMediaSourceType
+  fileUrl      String
+  thumbnailUrl String?
+  fileName     String?
+  sortNo       Int                    @default(0)
+  isMain       Boolean                @default(false)
+  status       String                 @default("enabled")
+  createdBy    String
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([tenantId, productId, sourceType])
+  @@index([tenantId, productId, isMain])
+}
+
+model ProductAiTask {
+  id                String              @id @default(cuid())
+  tenantId          String
+  taskNo            String              @unique
+  productId         String
+  taskType          ProductAiTaskType
+  status            ProductAiTaskStatus @default(CREATED)
+  progress          Int                 @default(0)
+  sourceMediaIds    Json
+  inputSnapshotJson Json
+  promptText        String?
+  totalCount        Int                 @default(0)
+  successCount      Int                 @default(0)
+  failCount         Int                 @default(0)
+  errorMessage      String?
+  createdBy         String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  finishedAt        DateTime?
+  assets            ProductAiAsset[]
+
+  @@index([tenantId, productId, status])
+  @@index([tenantId, taskType])
+}
+
+model ProductAiAsset {
+  id               String                     @id @default(cuid())
+  tenantId         String
+  productId        String
+  taskId           String
+  task             ProductAiTask              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assetType        ProductAiAssetType
+  assetName        String
+  bizTag           String?
+  currentVersionId String?
+  auditStatus      ProductAiAssetAuditStatus  @default(PENDING)
+  publishStatus    ProductAiAssetPublishStatus @default(DRAFT)
+  createdBy        String
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  versions         ProductAiAssetVersion[]
+  usages           ProductMediaUsage[]
+
+  @@index([tenantId, productId, assetType])
+  @@index([taskId])
+}
+
+model ProductAiAssetVersion {
+  id              String                    @id @default(cuid())
+  tenantId        String
+  assetId         String
+  asset           ProductAiAsset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  versionNo       Int
+  parentVersionId String?
+  versionType     ProductAiAssetVersionType
+  editPrompt      String?
+  fileUrl         String
+  thumbnailUrl    String?
+  width           Int?
+  height          Int?
+  fileSize        BigInt?
+  isCurrent       Boolean                   @default(false)
+  createdBy       String
+  createdAt       DateTime                  @default(now())
+  usages          ProductMediaUsage[]
+
+  @@unique([assetId, versionNo])
+  @@index([tenantId, assetId, isCurrent])
+}
+
+model ProductMediaUsage {
+  id          String                @id @default(cuid())
+  tenantId    String
+  productId   String
+  assetId     String
+  asset       ProductAiAsset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     ProductAiAssetVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  usageType   ProductMediaUsageType
+  usageTarget String?
+  sortNo      Int                    @default(0)
+  status      String                 @default("active")
+  createdBy   String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([tenantId, productId, usageType])
+  @@index([assetId, versionId])
 }
