@@ -9,6 +9,7 @@ import routes from './routes';
 
 const { UMI_ENV = 'dev' } = process.env;
 const enableOpenApiGeneration = process.env.ENABLE_OPENAPI_GENERATION === 'true';
+const enableUtoopack = process.env.ENABLE_UTOOPACK === 'true';
 
 /**
  * @name 使用公共路径
@@ -126,7 +127,7 @@ export default defineConfig({
   /**
    * @name antd 插件
    * @description 内置了 babel import 插件
-   * @doc https://umijs.org/docs/max/antd#antd
+   * @doc https://ant.design/docs/react/customize-theme
    */
   antd: {
     appConfig: {},
@@ -193,7 +194,7 @@ export default defineConfig({
     include: ['src/pages/**/_mock.ts'],
     exclude: ['mock/requestRecord.mock.js'],
   },
-  utoopack: {},
+  ...(enableUtoopack ? { utoopack: {} } : {}),
   requestRecord: {},
   exportStatic: {},
   define: {
