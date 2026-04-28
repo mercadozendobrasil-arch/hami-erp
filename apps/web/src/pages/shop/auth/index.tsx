@@ -140,7 +140,7 @@ const ShopAuthPage: React.FC = () => {
                 <Button block onClick={() => history.push('/product/list')}>
                   打开商品列表
                 </Button>
-                <Button block onClick={() => history.push('/order/all')}>
+                <Button block onClick={() => history.push('/order/pending')}>
                   打开订单列表
                 </Button>
               </Space>
