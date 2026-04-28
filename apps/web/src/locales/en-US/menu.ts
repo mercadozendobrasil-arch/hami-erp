@@ -56,8 +56,6 @@ export default {
   'menu.product': 'Product',
   'menu.product.product-list': 'Product List',
   'menu.order': 'Order Center',
-  'menu.order.order-list': 'Order List',
-  'menu.order.all-orders': 'All Orders',
   'menu.order.pending-orders': 'Pending Orders',
   'menu.order.pending-audit-orders': 'Pending Audit',
   'menu.order.pending-shipment-orders': 'Pending Shipment',

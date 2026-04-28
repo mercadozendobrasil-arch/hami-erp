@@ -80,7 +80,7 @@ const ShopListPage: React.FC = () => {
         </a>,
         <a
           key="view-orders"
-          onClick={() => history.push(`/order/all?shopId=${record.shopId}`)}
+          onClick={() => history.push(`/order/pending?shopId=${record.shopId}`)}
         >
           查看订单
         </a>,
@@ -129,7 +129,7 @@ const ShopListPage: React.FC = () => {
           <Button key="products" onClick={() => history.push('/product/list')}>
             查看商品
           </Button>,
-          <Button key="orders" onClick={() => history.push('/order/all')}>
+          <Button key="orders" onClick={() => history.push('/order/pending')}>
             查看订单
           </Button>,
         ]}
