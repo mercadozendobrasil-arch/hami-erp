@@ -34,28 +34,78 @@ enum ErpLabelStatus {
   DOWNLOADED
 }
 
+enum ErpProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ErpPlatformPublishStatus {
+  UNBOUND
+  DRAFT
+  PUBLISHING
+  ACTIVE
+  FAILED
+  INACTIVE
+}
+
+enum ErpInventoryMovementType {
+  INITIAL
+  ADJUSTMENT
+  PURCHASE_IN
+  SALE_LOCK
+  SALE_RELEASE
+  SALE_OUT
+  RETURN_IN
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum ErpInventoryReservationStatus {
+  LOCKED
+  RELEASED
+  FULFILLED
+  CANCELLED
+}
+
+enum ErpPurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum ErpPurchaseItemStatus {
+  PENDING
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
 model ShopeeShop {
-  id          String          @id @default(cuid())
-  shopId      BigInt          @unique
-  region      String?
-  shopName    String?
-  status      ShopStatus      @default(ACTIVE)
-  tokens      ShopeeToken[]
-  webhooks    WebhookEvent[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id        String         @id @default(cuid())
+  shopId    BigInt         @unique
+  region    String?
+  shopName  String?
+  status    ShopStatus     @default(ACTIVE)
+  tokens    ShopeeToken[]
+  webhooks  WebhookEvent[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }
 
 model ShopeeToken {
-  id                    String      @id @default(cuid())
-  shop                  ShopeeShop  @relation(fields: [shopRef], references: [id], onDelete: Cascade)
+  id                    String     @id @default(cuid())
+  shop                  ShopeeShop @relation(fields: [shopRef], references: [id], onDelete: Cascade)
   shopRef               String
   accessToken           String
   refreshToken          String
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   @@index([shopRef])
 }
@@ -74,6 +124,69 @@ model JobRecord {
 
   @@index([queueName, status])
   @@index([jobName, status])
+  @@index([createdAt])
+}
+
+model ErpSystemUser {
+  id          String              @id @default(cuid())
+  username    String              @unique
+  displayName String?
+  email       String?
+  active      Boolean             @default(true)
+  roles       ErpSystemUserRole[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([active])
+  @@index([username])
+}
+
+model ErpSystemRole {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  name        String
+  description String?
+  permissions Json
+  active      Boolean             @default(true)
+  users       ErpSystemUserRole[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([active])
+  @@index([name])
+}
+
+model ErpSystemUserRole {
+  id        String        @id @default(cuid())
+  user      ErpSystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      ErpSystemRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId    String
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model ErpSystemAuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  actorName    String?
+  module       String
+  action       String
+  status       String
+  resourceId   String?
+  message      String?
+  request      Json?
+  response     Json?
+  errorMessage String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([module, action])
+  @@index([status])
   @@index([createdAt])
 }
 
@@ -122,6 +235,354 @@ model ErpOrderProjection {
   @@index([updateTime])
 }
 
+model ErpOrderException {
+  id            String    @id @default(cuid())
+  shopId        String
+  orderSn       String
+  exceptionType String
+  status        String    @default("OPEN")
+  severity      String    @default("MEDIUM")
+  message       String?
+  source        String    @default("ERP")
+  jobRecordId   String?
+  metadata      Json?
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([shopId, orderSn])
+  @@index([shopId, status])
+  @@index([exceptionType, status])
+  @@index([jobRecordId])
+  @@index([createdAt])
+}
+
+model ErpOrderStageHistory {
+  id          String   @id @default(cuid())
+  shopId      String
+  orderSn     String
+  fromStage   String?
+  toStage     String
+  trigger     String
+  action      String?
+  jobRecordId String?
+  metadata    Json?
+  operatorId  String?
+  createdAt   DateTime @default(now())
+
+  @@index([shopId, orderSn])
+  @@index([toStage])
+  @@index([jobRecordId])
+  @@index([createdAt])
+}
+
+model ErpOrderFinanceSnapshot {
+  id              String   @id @default(cuid())
+  shopId          String
+  orderSn         String
+  currency        String   @default("BRL")
+  revenue         Decimal  @default(0) @db.Decimal(18, 2)
+  productCost     Decimal  @default(0) @db.Decimal(18, 2)
+  platformFee     Decimal  @default(0) @db.Decimal(18, 2)
+  logisticsFee    Decimal  @default(0) @db.Decimal(18, 2)
+  otherFee        Decimal  @default(0) @db.Decimal(18, 2)
+  grossProfit     Decimal  @default(0) @db.Decimal(18, 2)
+  grossMarginRate Decimal? @db.Decimal(10, 4)
+  estimated       Boolean  @default(true)
+  missingCost     Boolean  @default(false)
+  source          String   @default("ORDER_PROJECTION")
+  detail          Json?
+  calculatedAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shopId, orderSn])
+  @@index([shopId, calculatedAt])
+  @@index([grossProfit])
+  @@index([missingCost])
+}
+
+model ErpProduct {
+  id               String               @id @default(cuid())
+  title            String
+  description      String?
+  categoryName     String?
+  brand            String?
+  status           ErpProductStatus     @default(DRAFT)
+  parentSku        String?
+  currency         String               @default("BRL")
+  price            Decimal?             @db.Decimal(18, 2)
+  costPrice        Decimal?             @db.Decimal(18, 2)
+  declaredValue    Decimal?             @db.Decimal(18, 2)
+  weightKg         Decimal?             @db.Decimal(10, 3)
+  widthCm          Decimal?             @db.Decimal(10, 2)
+  lengthCm         Decimal?             @db.Decimal(10, 2)
+  heightCm         Decimal?             @db.Decimal(10, 2)
+  defaultImageUrl  String?
+  sourceUrl        String?
+  attributes       Json?
+  raw              Json?
+  skus             ErpSku[]
+  platformProducts ErpPlatformProduct[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([status])
+  @@index([parentSku])
+  @@index([updatedAt])
+}
+
+model ErpSku {
+  id            String                    @id @default(cuid())
+  product       ErpProduct                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     String
+  skuCode       String
+  barcode       String?
+  optionName    String?
+  optionValue   String?
+  status        String                    @default("ACTIVE")
+  price         Decimal?                  @db.Decimal(18, 2)
+  costPrice     Decimal?                  @db.Decimal(18, 2)
+  declaredValue Decimal?                  @db.Decimal(18, 2)
+  stock         Int                       @default(0)
+  attributes    Json?
+  platformSkus  ErpPlatformSku[]
+  balances      ErpInventoryBalance[]
+  ledgers       ErpInventoryLedger[]
+  reservations  ErpInventoryReservation[]
+  purchaseItems ErpPurchaseOrderItem[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@unique([skuCode])
+  @@index([productId])
+  @@index([status])
+}
+
+model ErpPlatformProduct {
+  id            String                   @id @default(cuid())
+  product       ErpProduct               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     String
+  platform      String                   @default("SHOPEE")
+  shopId        String
+  itemId        String?
+  publishStatus ErpPlatformPublishStatus @default(UNBOUND)
+  title         String?
+  raw           Json?
+  lastSyncedAt  DateTime?
+  skus          ErpPlatformSku[]
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@unique([platform, shopId, itemId])
+  @@index([productId])
+  @@index([platform, shopId])
+  @@index([publishStatus])
+}
+
+model ErpPlatformSku {
+  id                String             @id @default(cuid())
+  platformProduct   ErpPlatformProduct @relation(fields: [platformProductId], references: [id], onDelete: Cascade)
+  platformProductId String
+  sku               ErpSku?            @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  skuId             String?
+  platformSkuId     String?
+  modelId           String?
+  skuCode           String?
+  price             Decimal?           @db.Decimal(18, 2)
+  stock             Int                @default(0)
+  syncStatus        String             @default("PENDING")
+  raw               Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([platformProductId])
+  @@index([skuId])
+  @@index([platformSkuId])
+  @@index([modelId])
+}
+
+model ErpSkuMappingLog {
+  id         String   @id @default(cuid())
+  productId  String?
+  skuId      String?
+  platform   String   @default("SHOPEE")
+  shopId     String?
+  itemId     String?
+  modelId    String?
+  action     String
+  status     String
+  message    String?
+  request    Json?
+  response   Json?
+  operatorId String?
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([skuId])
+  @@index([platform, shopId])
+  @@index([action, status])
+  @@index([createdAt])
+}
+
+model ErpWarehouse {
+  id             String                    @id @default(cuid())
+  code           String                    @unique
+  name           String
+  region         String?
+  address        String?
+  contactName    String?
+  contactPhone   String?
+  active         Boolean                   @default(true)
+  balances       ErpInventoryBalance[]
+  ledgers        ErpInventoryLedger[]
+  reservations   ErpInventoryReservation[]
+  purchaseOrders ErpPurchaseOrder[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([active])
+  @@index([name])
+}
+
+model ErpInventoryBalance {
+  id          String       @id @default(cuid())
+  warehouse   ErpWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  warehouseId String
+  sku         ErpSku       @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  skuId       String
+  onHand      Int          @default(0)
+  locked      Int          @default(0)
+  salable     Int          @default(0)
+  safetyStock Int          @default(0)
+  updatedBy   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([warehouseId, skuId])
+  @@index([skuId])
+  @@index([warehouseId])
+  @@index([salable])
+}
+
+model ErpInventoryLedger {
+  id            String                   @id @default(cuid())
+  warehouse     ErpWarehouse             @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  warehouseId   String
+  sku           ErpSku                   @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  skuId         String
+  movementType  ErpInventoryMovementType
+  quantity      Int
+  beforeOnHand  Int
+  afterOnHand   Int
+  beforeLocked  Int                      @default(0)
+  afterLocked   Int                      @default(0)
+  referenceType String?
+  referenceId   String?
+  orderSn       String?
+  note          String?
+  operatorId    String?
+  createdAt     DateTime                 @default(now())
+
+  @@index([warehouseId, skuId])
+  @@index([skuId, createdAt])
+  @@index([movementType, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([orderSn])
+}
+
+model ErpInventoryReservation {
+  id          String                        @id @default(cuid())
+  warehouse   ErpWarehouse                  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  warehouseId String
+  sku         ErpSku                        @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  skuId       String
+  orderSn     String?
+  quantity    Int
+  status      ErpInventoryReservationStatus @default(LOCKED)
+  note        String?
+  operatorId  String?
+  releasedAt  DateTime?
+  fulfilledAt DateTime?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  @@index([warehouseId, skuId])
+  @@index([skuId, status])
+  @@index([orderSn, status])
+  @@index([status, createdAt])
+}
+
+model ErpSupplier {
+  id          String             @id @default(cuid())
+  code        String             @unique
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  taxId       String?
+  currency    String             @default("BRL")
+  active      Boolean            @default(true)
+  remark      String?
+  raw         Json?
+  orders      ErpPurchaseOrder[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([active])
+  @@index([name])
+}
+
+model ErpPurchaseOrder {
+  id               String                 @id @default(cuid())
+  orderNo          String                 @unique
+  supplier         ErpSupplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId       String
+  warehouse        ErpWarehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  warehouseId      String?
+  status           ErpPurchaseOrderStatus @default(DRAFT)
+  currency         String                 @default("BRL")
+  totalAmount      Decimal?               @db.Decimal(18, 2)
+  expectedArriveAt DateTime?
+  submittedAt      DateTime?
+  receivedAt       DateTime?
+  cancelledAt      DateTime?
+  remark           String?
+  items            ErpPurchaseOrderItem[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([supplierId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([expectedArriveAt])
+  @@index([createdAt])
+}
+
+model ErpPurchaseOrderItem {
+  id               String                @id @default(cuid())
+  purchaseOrder    ErpPurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId  String
+  sku              ErpSku                @relation(fields: [skuId], references: [id], onDelete: Restrict)
+  skuId            String
+  skuCodeSnapshot  String
+  productTitle     String?
+  quantity         Int
+  receivedQuantity Int                   @default(0)
+  unitCost         Decimal?              @db.Decimal(18, 2)
+  totalCost        Decimal?              @db.Decimal(18, 2)
+  status           ErpPurchaseItemStatus @default(PENDING)
+  remark           String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([purchaseOrderId])
+  @@index([skuId])
+  @@index([status])
+}
+
 model ErpOrderOperationLog {
   id           String   @id @default(cuid())
   shopId       String?
@@ -162,16 +623,16 @@ model ErpShippingLabelRecord {
 }
 
 model WebhookEvent {
-  id          String         @id @default(cuid())
-  shop        ShopeeShop?    @relation(fields: [shopRef], references: [id], onDelete: SetNull)
+  id          String        @id @default(cuid())
+  shop        ShopeeShop?   @relation(fields: [shopRef], references: [id], onDelete: SetNull)
   shopRef     String?
   topic       String
-  eventId     String?        @unique
+  eventId     String?       @unique
   payload     Json
-  status      WebhookStatus  @default(PENDING)
+  status      WebhookStatus @default(PENDING)
   processedAt DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([shopRef, status])
 }

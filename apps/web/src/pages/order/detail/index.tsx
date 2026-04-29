@@ -16,6 +16,7 @@ import {
   Row,
   Space,
   Tag,
+  Timeline,
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
@@ -70,6 +71,38 @@ function statusTag(value?: string) {
   return (
     <Tag color={orderStatusColor[value] || 'default'}>
       {orderStatusLabel[value] || value}
+    </Tag>
+  );
+}
+
+const exceptionStatusLabel: Record<string, string> = {
+  OPEN: '待处理',
+  MANUAL_REVIEW: '人工处理中',
+  RECHECKING: '重新校验中',
+  IGNORED: '已忽略',
+  RESOLVED: '已解决',
+};
+
+const exceptionStatusColor: Record<string, string> = {
+  OPEN: 'error',
+  MANUAL_REVIEW: 'warning',
+  RECHECKING: 'processing',
+  IGNORED: 'default',
+  RESOLVED: 'success',
+};
+
+const severityColor: Record<string, string> = {
+  LOW: 'green',
+  MEDIUM: 'gold',
+  HIGH: 'orange',
+  CRITICAL: 'red',
+};
+
+function exceptionStatusTag(value?: string) {
+  if (!value) return <Tag color="success">无异常</Tag>;
+  return (
+    <Tag color={exceptionStatusColor[value] || 'default'}>
+      {exceptionStatusLabel[value] || value}
     </Tag>
   );
 }
@@ -245,6 +278,70 @@ const OrderDetailPage: React.FC = () => {
                   },
                 ]}
               />
+            </Card>
+          </Col>
+
+          <Col xs={24} xl={12}>
+            <Card title="异常处理">
+              {data.latestException ? (
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Space wrap>
+                    {exceptionStatusTag(data.latestException.status)}
+                    <Tag color={severityColor[data.latestException.severity] || 'default'}>
+                      {data.latestException.severity}
+                    </Tag>
+                    <Tag>{data.latestException.exceptionType}</Tag>
+                    <Tag color="blue">{data.latestException.source}</Tag>
+                  </Space>
+                  <Typography.Paragraph style={{ marginBottom: 0 }}>
+                    {data.latestException.message || '暂无异常说明'}
+                  </Typography.Paragraph>
+                  <Typography.Text type="secondary">
+                    发现时间：{formatTime(data.latestException.createdAt)}
+                  </Typography.Text>
+                  {data.latestException.resolvedAt ? (
+                    <Typography.Text type="secondary">
+                      解决时间：{formatTime(data.latestException.resolvedAt)}
+                    </Typography.Text>
+                  ) : null}
+                </Space>
+              ) : (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="当前没有活跃异常"
+                />
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} xl={12}>
+            <Card title="履约阶段历史">
+              {data.stageHistory?.length ? (
+                <Timeline
+                  items={data.stageHistory.map((item) => ({
+                    color: item.toStage === data.fulfillmentStage ? 'blue' : 'gray',
+                    children: (
+                      <Space direction="vertical" size={2}>
+                        <Typography.Text strong>
+                          {item.fromStage || '新建'} → {item.toStage}
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                          {item.trigger}
+                          {item.action ? ` / ${item.action}` : ''}
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                          {formatTime(item.createdAt)}
+                        </Typography.Text>
+                      </Space>
+                    ),
+                  }))}
+                />
+              ) : (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="暂无阶段流转记录"
+                />
+              )}
             </Card>
           </Col>
 

@@ -18,9 +18,10 @@ Recommended public URLs:
 The frontend should keep calling relative API paths such as:
 
 ```txt
-/api/shopee/shops
+/api/erp/orders
+/api/erp/products
+/api/erp/inventory/balances
 /api/shopee/auth/authorize-url
-/api/shopee/auth/callback
 ```
 
 Do not hard-code `localhost`, the server IP, or an API domain inside browser-facing frontend code.
@@ -88,9 +89,16 @@ sudo systemctl reload nginx
 From the repository root:
 
 ```bash
-npm install
-npm --workspace apps/api run build
-npm --workspace apps/web run build
+corepack enable
+cd apps/api
+corepack pnpm install
+corepack pnpm exec prisma generate
+corepack pnpm exec prisma migrate deploy
+corepack pnpm run build
+
+cd ../web
+corepack pnpm install
+corepack pnpm run build
 ```
 
 Run the API with your process manager. Example with PM2:
@@ -108,6 +116,38 @@ apps/web/dist
 
 If your deployment path is different, update the `root` directive in `deploy/nginx/hamimih.com.conf`.
 
+## ERP migrations
+
+The ERP blueprint rollout adds database migrations for:
+
+- order exception and stage history
+- local products and SKU mappings
+- warehouses, inventory balances, inventory ledgers, and stock reservations
+- suppliers, purchase orders, and purchase receiving
+- order finance snapshots
+- system roles, users, audit logs, and task log views
+
+Deploy these with:
+
+```bash
+cd apps/api
+corepack pnpm exec prisma migrate deploy
+```
+
+Do not use `prisma db push` in production. `db push` is acceptable only for disposable local databases.
+
+## Security cleanup before deploy
+
+Before committing or deploying, verify that local runtime files are not tracked:
+
+```bash
+git ls-files | grep -E '(^|/)(\.env|\.local-postgres|dist|node_modules)(/|$)|\.env$'
+```
+
+The command should only show intentional examples such as `.env.example`; it should not show real `.env` files, local PostgreSQL data, `dist`, or `node_modules`.
+
+If any secret was previously committed, rotate it in Shopee/Open Platform and in the database provider before deploying.
+
 ## Verification
 
 After deployment, check:
@@ -115,6 +155,7 @@ After deployment, check:
 ```bash
 curl -I https://hamimih.com
 curl -I https://hamimih.com/api/shopee/shops
+curl -I https://hamimih.com/api/erp/jobs
 ```
 
 Expected behavior:
@@ -125,6 +166,17 @@ Expected behavior:
 | `404` | Nginx route or backend route mismatch |
 | `502` | API is not running or not listening on `127.0.0.1:3001` |
 | Cloudflare `521/522` | server firewall, Nginx, or origin connectivity problem |
+
+Then verify these ERP pages in the browser:
+
+- `/shop/list`
+- `/order/all`
+- `/product/list`
+- `/product/sku-mappings`
+- `/inventory/stock`
+- `/purchase/orders`
+- `/reports/finance`
+- `/system/admin`
 
 ## Cloudflare
 

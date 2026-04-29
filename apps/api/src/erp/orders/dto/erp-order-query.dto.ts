@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export const ERP_FULFILLMENT_STAGES = [
   'pending_invoice',
@@ -23,6 +23,19 @@ export class ErpOrderQueryDto {
   @IsOptional()
   @IsString()
   orderSn?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  hasActiveException?: boolean;
+
+  @IsOptional()
+  @IsString()
+  exceptionType?: string;
+
+  @IsOptional()
+  @IsString()
+  exceptionStatus?: string;
 
   @IsOptional()
   @Transform(({ value }) => Number(value))

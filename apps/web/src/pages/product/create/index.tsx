@@ -8,6 +8,7 @@ import {
   PageContainer,
   ProForm,
   ProFormDigit,
+  type ProFormInstance,
   ProFormRadio,
   ProFormSelect,
   ProFormText,
@@ -15,13 +16,17 @@ import {
 } from '@ant-design/pro-components';
 import { history, useLocation } from '@umijs/max';
 import { Button, Card, Empty, message, Space, Typography, Upload } from 'antd';
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { createErpProduct } from '@/services/erp/product';
 import './style.less';
 
 const sectionStyle = { marginBottom: 16 };
 
 const ProductCreatePage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
+  const formRef = useRef<ProFormInstance<ERP.ProductSavePayload> | undefined>(
+    undefined,
+  );
   const location = useLocation();
   const shopId = useMemo(
     () => new URLSearchParams(location.search).get('shopId') || undefined,
@@ -56,7 +61,7 @@ const ProductCreatePage: React.FC = () => {
         <Button
           key="save"
           icon={<SaveOutlined />}
-          onClick={() => messageApi.info('暂未接入')}
+          onClick={() => formRef.current?.submit?.()}
         >
           保存
         </Button>,
@@ -72,10 +77,35 @@ const ProductCreatePage: React.FC = () => {
       {contextHolder}
       <div className="erp-create-shell">
         <div className="erp-create-main">
-          <ProForm
+          <ProForm<ERP.ProductSavePayload>
+            formRef={formRef}
             submitter={false}
             layout="horizontal"
             labelCol={{ flex: '130px' }}
+            onFinish={async (values) => {
+              const response = await createErpProduct({
+                ...values,
+                shopId,
+                currency: 'BRL',
+                categoryName: String(
+                  (values as ERP.ProductSavePayload & { category?: string }).category ||
+                    values.categoryName ||
+                    '',
+                ),
+                skus: [
+                  {
+                    skuCode: values.parentSku || `SKU-${Date.now()}`,
+                    price: values.price,
+                    stock: Number(values.stock || 0),
+                  },
+                ],
+              });
+              messageApi.success('已保存本地商品草稿');
+              history.replace(
+                `/product/list?shopId=${shopId}&productId=${response.data.productId || response.data.id}`,
+              );
+              return true;
+            }}
           >
             <Card id="basic" title="基本信息" style={sectionStyle}>
               <ProFormSelect

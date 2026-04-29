@@ -8,6 +8,7 @@ import {
   ErpOrderAfterSaleDto,
   ErpOrderAuditDto,
   ErpOrderCancelDto,
+  ErpOrderExceptionBatchDto,
   ErpOrderLockDto,
   ErpOrderLogisticsDto,
   ErpOrderMergeDto,
@@ -195,6 +196,40 @@ export class ErpOrderActionsService {
     return this.success(response);
   }
 
+  async transferExceptionsToManualReview(payload: ErpOrderExceptionBatchDto) {
+    return this.updateExceptionStatus(payload, {
+      status: 'MANUAL_REVIEW',
+      action: 'TRANSFER_EXCEPTION_TO_MANUAL_REVIEW',
+      message: 'Exception transferred to manual review.',
+    });
+  }
+
+  async recheckExceptions(payload: ErpOrderExceptionBatchDto) {
+    return this.updateExceptionStatus(payload, {
+      status: 'RECHECKING',
+      action: 'RECHECK_EXCEPTION',
+      message: 'Exception queued for recheck.',
+    });
+  }
+
+  async ignoreExceptions(payload: ErpOrderExceptionBatchDto) {
+    return this.updateExceptionStatus(payload, {
+      status: 'IGNORED',
+      action: 'IGNORE_EXCEPTION',
+      message: 'Exception ignored by operator.',
+      resolved: true,
+    });
+  }
+
+  async resolveExceptions(payload: ErpOrderExceptionBatchDto) {
+    return this.updateExceptionStatus(payload, {
+      status: 'RESOLVED',
+      action: 'RESOLVE_EXCEPTION',
+      message: 'Exception resolved by operator.',
+      resolved: true,
+    });
+  }
+
   private async setLockState(
     orderSn: string,
     payload: ErpOrderLockDto,
@@ -208,6 +243,73 @@ export class ErpOrderActionsService {
         locked ? 'lock' : 'unlock',
         { reason: payload.reason },
       ),
+    });
+  }
+
+  private async updateExceptionStatus(
+    payload: ErpOrderExceptionBatchDto,
+    options: {
+      status: string;
+      action: string;
+      message: string;
+      resolved?: boolean;
+    },
+  ) {
+    const successList: Array<{ shopId: string; orderSn: string; affected: number }> = [];
+    const failList: Array<{ shopId: string; orderSn: string; errorMessage: string }> = [];
+
+    for (const order of payload.orders) {
+      try {
+        const updateResult = await this.prismaService.erpOrderException.updateMany({
+          where: {
+            shopId: order.shopId,
+            orderSn: order.orderSn,
+            status: { in: ['OPEN', 'RECHECKING', 'MANUAL_REVIEW'] },
+          },
+          data: {
+            status: options.status,
+            ...(options.resolved
+              ? {
+                  resolvedAt: new Date(),
+                  resolvedBy: 'system',
+                }
+              : {
+                  resolvedAt: null,
+                  resolvedBy: null,
+                }),
+          },
+        });
+
+        await this.recordOrderLog({
+          shopId: order.shopId,
+          orderSn: order.orderSn,
+          action: options.action,
+          status: 'SUCCESS',
+          message: options.message,
+          request: payload,
+          response: { affected: updateResult.count, reason: payload.reason },
+        });
+
+        successList.push({
+          shopId: order.shopId,
+          orderSn: order.orderSn,
+          affected: updateResult.count,
+        });
+      } catch (error) {
+        failList.push({
+          shopId: order.shopId,
+          orderSn: order.orderSn,
+          errorMessage: error instanceof Error ? error.message : 'Update exception status failed.',
+        });
+      }
+    }
+
+    return this.success({
+      totalNum: payload.orders.length,
+      processedNum: successList.length + failList.length,
+      successList,
+      failList,
+      affected: successList.reduce((sum, item) => sum + item.affected, 0),
     });
   }
 
@@ -236,7 +338,17 @@ export class ErpOrderActionsService {
     orderSn: string,
     data: Prisma.ErpOrderProjectionUpdateInput,
   ) {
-    return this.prismaService.erpOrderProjection.upsert({
+    const previous = await this.prismaService.erpOrderProjection.findUnique({
+      where: {
+        shopId_orderSn: {
+          shopId,
+          orderSn,
+        },
+      },
+      select: { fulfillmentStage: true },
+    });
+
+    const projection = await this.prismaService.erpOrderProjection.upsert({
       where: {
         shopId_orderSn: {
           shopId,
@@ -263,6 +375,21 @@ export class ErpOrderActionsService {
         raw: this.optionalJsonValue(data.raw),
       },
     });
+
+    if (
+      typeof data.fulfillmentStage === 'string' &&
+      previous?.fulfillmentStage !== data.fulfillmentStage
+    ) {
+      await this.recordStageHistory({
+        shopId,
+        orderSn,
+        fromStage: previous?.fulfillmentStage,
+        toStage: data.fulfillmentStage,
+        trigger: 'MANUAL_ACTION',
+      });
+    }
+
+    return projection;
   }
 
   private async findRaw(shopId: string, orderSn: string) {
@@ -322,6 +449,24 @@ export class ErpOrderActionsService {
         response: input.response ? this.toJson(input.response) : undefined,
         errorMessage: input.errorMessage,
         operatorId: input.operatorId,
+      },
+    });
+  }
+
+  private async recordStageHistory(input: {
+    shopId: string;
+    orderSn: string;
+    fromStage?: string;
+    toStage: string;
+    trigger: string;
+  }) {
+    return this.prismaService.erpOrderStageHistory.create({
+      data: {
+        shopId: input.shopId,
+        orderSn: input.orderSn,
+        fromStage: input.fromStage,
+        toStage: input.toStage,
+        trigger: input.trigger,
       },
     });
   }

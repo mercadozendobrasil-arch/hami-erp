@@ -29,6 +29,53 @@ const STAGE_TO_SHOPEE_STATUS: Record<ErpFulfillmentStage, string> = {
 const DEFAULT_RESPONSE_FIELDS =
   'order_status,package_list,buyer_username,total_amount,currency,create_time,update_time,shipping_carrier,checkout_shipping_carrier';
 
+const ACTIVE_EXCEPTION_STATUSES = ['OPEN', 'RECHECKING', 'MANUAL_REVIEW'];
+
+type OrderProjectionListRow = {
+  id: string;
+  shopId: string;
+  orderSn: string;
+  orderStatus: string;
+  fulfillmentStage: string;
+  packageNumber: string | null;
+  packageStatus: string | null;
+  logisticsStatus: string | null;
+  shippingCarrier: string | null;
+  shippingDocumentStatus: string | null;
+  shippingDocumentType: string | null;
+  buyerUsername: string | null;
+  totalAmount: Prisma.Decimal | null;
+  currency: string | null;
+  createTime: Date | null;
+  updateTime: Date | null;
+  lastSyncedAt: Date;
+};
+
+type OrderProjectionDetailRow = OrderProjectionListRow & {
+  raw?: Prisma.JsonValue | null;
+};
+
+type OrderEnrichment = {
+  latestException?: {
+    id: string;
+    exceptionType: string;
+    status: string;
+    severity: string;
+    message: string | null;
+    source: string;
+    createdAt: Date;
+    resolvedAt: Date | null;
+  };
+  stageHistory: Array<{
+    id: string;
+    fromStage: string | null;
+    toStage: string;
+    trigger: string;
+    action: string | null;
+    createdAt: Date;
+  }>;
+};
+
 @Injectable()
 export class ErpOrdersService {
   constructor(
@@ -83,12 +130,24 @@ export class ErpOrdersService {
 
     const current = query.current ?? 1;
     const pageSize = query.pageSize ?? 20;
+    const exceptionPairs = await this.findExceptionOrderPairs(query);
+    if (exceptionPairs && exceptionPairs.length === 0) {
+      return {
+        success: true,
+        data: [],
+        total: 0,
+        current,
+        pageSize,
+      };
+    }
+
     const where: Prisma.ErpOrderProjectionWhereInput = {
       ...(query.shopId ? { shopId: query.shopId } : {}),
       ...(query.fulfillmentStage
         ? { fulfillmentStage: query.fulfillmentStage }
         : {}),
       ...(query.orderSn ? { orderSn: { contains: query.orderSn } } : {}),
+      ...(exceptionPairs ? { OR: exceptionPairs } : {}),
     };
 
     const [total, data] = await this.prismaService.$transaction([
@@ -100,10 +159,11 @@ export class ErpOrdersService {
         take: pageSize,
       }),
     ]);
+    const enrichments = await this.loadOrderEnrichments(data);
 
     return {
       success: true,
-      data: data.map((item) => this.toListItem(item)),
+      data: data.map((item) => this.toListItem(item, enrichments.get(this.orderKey(item)))),
       total,
       current,
       pageSize,
@@ -124,7 +184,10 @@ export class ErpOrdersService {
 
     return {
       success: true,
-      data: this.toDetailItem(projection),
+      data: this.toDetailItem(
+        projection,
+        (await this.loadOrderEnrichments([projection])).get(this.orderKey(projection)),
+      ),
     };
   }
 
@@ -167,6 +230,16 @@ export class ErpOrdersService {
     } catch (error) {
       const message = this.errorMessage(error, 'Sync order detail failed.');
       await this.failJob(jobRecord.id, message);
+      await this.recordOrderException({
+        shopId: payload.shopId,
+        orderSn,
+        exceptionType: 'sync_failed',
+        severity: 'HIGH',
+        message,
+        source: 'SYNC_ORDER_DETAIL',
+        jobRecordId: jobRecord.id,
+        metadata: payload,
+      });
       await this.recordOrderLog({
         shopId: payload.shopId,
         orderSn,
@@ -323,6 +396,20 @@ export class ErpOrdersService {
           data: { status: ErpLabelStatus.FAILED, errorMessage: message },
         }),
       ]);
+      await Promise.all(
+        payload.orders.map((order) =>
+          this.recordOrderException({
+            shopId: payload.shopId,
+            orderSn: order.orderSn,
+            exceptionType: 'label_failed',
+            severity: 'HIGH',
+            message,
+            source: 'CREATE_SHIPPING_DOCUMENT',
+            jobRecordId: jobRecord.id,
+            metadata: payload,
+          }),
+        ),
+      );
       throw error;
     }
   }
@@ -408,6 +495,16 @@ export class ErpOrdersService {
         successList: [],
         failList: [{ orderSn, errorMessage: message }],
       });
+      await this.recordOrderException({
+        shopId: payload.shopId,
+        orderSn,
+        exceptionType: 'logistics_blocked',
+        severity: 'HIGH',
+        message,
+        source: 'ARRANGE_SHIPMENT',
+        jobRecordId: jobRecord.id,
+        metadata: payload,
+      });
       await this.recordOrderLog({
         shopId: payload.shopId,
         orderSn,
@@ -479,9 +576,20 @@ export class ErpOrdersService {
         });
         successList.push({ orderSn: order.orderSn, result });
       } catch (error) {
+        const message = this.errorMessage(error, 'Arrange shipment failed.');
         failList.push({
           orderSn: order.orderSn,
-          errorMessage: this.errorMessage(error, 'Arrange shipment failed.'),
+          errorMessage: message,
+        });
+        await this.recordOrderException({
+          shopId: payload.shopId,
+          orderSn: order.orderSn,
+          exceptionType: 'logistics_blocked',
+          severity: 'HIGH',
+          message,
+          source: 'BATCH_ARRANGE_SHIPMENT',
+          jobRecordId: jobRecord.id,
+          metadata: order,
         });
       }
     }
@@ -623,8 +731,17 @@ export class ErpOrdersService {
     const orderStatus = String(order.order_status ?? order.orderStatus ?? 'UNKNOWN');
     const firstPackage = this.firstObject(order.package_list);
     const stage = this.resolveFulfillmentStage(orderStatus, firstPackage);
+    const previous = await this.prismaService.erpOrderProjection.findUnique({
+      where: {
+        shopId_orderSn: {
+          shopId,
+          orderSn,
+        },
+      },
+      select: { fulfillmentStage: true },
+    });
 
-    return this.prismaService.erpOrderProjection.upsert({
+    const projection = await this.prismaService.erpOrderProjection.upsert({
       where: {
         shopId_orderSn: {
           shopId,
@@ -667,6 +784,32 @@ export class ErpOrdersService {
         raw: this.toJson(order),
       },
     });
+
+    if (previous?.fulfillmentStage !== stage) {
+      await this.recordStageHistory({
+        shopId,
+        orderSn,
+        fromStage: previous?.fulfillmentStage,
+        toStage: stage,
+        trigger: previous ? 'SYNC_UPDATE' : 'SYNC_CREATE',
+        action: 'UPSERT_ORDER_PROJECTION',
+        metadata: {
+          orderStatus,
+          packageStatus: firstPackage?.package_status,
+          shippingDocumentStatus: firstPackage?.shipping_document_status,
+        },
+      });
+    }
+
+    if (orderStatus === 'SHIPPED' || orderStatus === 'PROCESSED') {
+      await this.resolveOrderExceptions(shopId, orderSn, [
+        'logistics_blocked',
+        'label_failed',
+        'sync_failed',
+      ]);
+    }
+
+    return projection;
   }
 
   private async shipOrderDirect(orderSn: string, payload: ErpMarkReadyForPickupDto) {
@@ -689,8 +832,178 @@ export class ErpOrdersService {
         },
       ],
     });
+    await this.resolveOrderExceptions(payload.shopId, orderSn, [
+      'logistics_blocked',
+      'label_failed',
+    ]);
 
     return result;
+  }
+
+  private async findExceptionOrderPairs(
+    query: ErpOrderQueryDto,
+  ): Promise<Array<{ shopId: string; orderSn: string }> | undefined> {
+    const shouldFilter =
+      query.hasActiveException || query.exceptionType || query.exceptionStatus;
+    if (!shouldFilter) return undefined;
+
+    const where: Prisma.ErpOrderExceptionWhereInput = {
+      ...(query.shopId ? { shopId: query.shopId } : {}),
+      ...(query.orderSn ? { orderSn: { contains: query.orderSn } } : {}),
+      ...(query.exceptionType ? { exceptionType: query.exceptionType } : {}),
+      ...(query.exceptionStatus
+        ? { status: query.exceptionStatus }
+        : query.hasActiveException
+          ? { status: { in: ACTIVE_EXCEPTION_STATUSES } }
+          : {}),
+    };
+
+    const exceptions = await this.prismaService.erpOrderException.findMany({
+      where,
+      distinct: ['shopId', 'orderSn'],
+      select: { shopId: true, orderSn: true },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+
+    return exceptions.map((item) => ({
+      shopId: item.shopId,
+      orderSn: item.orderSn,
+    }));
+  }
+
+  private async loadOrderEnrichments(
+    orders: Array<{ shopId: string; orderSn: string }>,
+  ): Promise<Map<string, OrderEnrichment>> {
+    const result = new Map<string, OrderEnrichment>();
+    if (!orders.length) return result;
+
+    const orderPairs = orders.map((item) => ({
+      shopId: item.shopId,
+      orderSn: item.orderSn,
+    }));
+
+    for (const order of orders) {
+      result.set(this.orderKey(order), { stageHistory: [] });
+    }
+
+    const [exceptions, histories] = await this.prismaService.$transaction([
+      this.prismaService.erpOrderException.findMany({
+        where: {
+          OR: orderPairs,
+          status: { in: ACTIVE_EXCEPTION_STATUSES },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prismaService.erpOrderStageHistory.findMany({
+        where: { OR: orderPairs },
+        orderBy: { createdAt: 'desc' },
+        take: orderPairs.length * 5,
+      }),
+    ]);
+
+    for (const exception of exceptions) {
+      const key = this.orderKey(exception);
+      const enrichment = result.get(key);
+      if (enrichment && !enrichment.latestException) {
+        enrichment.latestException = {
+          id: exception.id,
+          exceptionType: exception.exceptionType,
+          status: exception.status,
+          severity: exception.severity,
+          message: exception.message,
+          source: exception.source,
+          createdAt: exception.createdAt,
+          resolvedAt: exception.resolvedAt,
+        };
+      }
+    }
+
+    for (const history of histories) {
+      const key = this.orderKey(history);
+      const enrichment = result.get(key);
+      if (enrichment && enrichment.stageHistory.length < 5) {
+        enrichment.stageHistory.push({
+          id: history.id,
+          fromStage: history.fromStage,
+          toStage: history.toStage,
+          trigger: history.trigger,
+          action: history.action,
+          createdAt: history.createdAt,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private async recordStageHistory(input: {
+    shopId: string;
+    orderSn: string;
+    fromStage?: string;
+    toStage: string;
+    trigger: string;
+    action?: string;
+    jobRecordId?: string;
+    metadata?: unknown;
+    operatorId?: string;
+  }) {
+    return this.prismaService.erpOrderStageHistory.create({
+      data: {
+        shopId: input.shopId,
+        orderSn: input.orderSn,
+        fromStage: input.fromStage,
+        toStage: input.toStage,
+        trigger: input.trigger,
+        action: input.action,
+        jobRecordId: input.jobRecordId,
+        metadata: input.metadata ? this.toJson(input.metadata) : undefined,
+        operatorId: input.operatorId,
+      },
+    });
+  }
+
+  private async recordOrderException(input: {
+    shopId: string;
+    orderSn: string;
+    exceptionType: string;
+    severity?: string;
+    message?: string;
+    source: string;
+    jobRecordId?: string;
+    metadata?: unknown;
+  }) {
+    return this.prismaService.erpOrderException.create({
+      data: {
+        shopId: input.shopId,
+        orderSn: input.orderSn,
+        exceptionType: input.exceptionType,
+        severity: input.severity ?? 'MEDIUM',
+        message: input.message,
+        source: input.source,
+        jobRecordId: input.jobRecordId,
+        metadata: input.metadata ? this.toJson(input.metadata) : undefined,
+      },
+    });
+  }
+
+  private async resolveOrderExceptions(
+    shopId: string,
+    orderSn: string,
+    exceptionTypes: string[],
+  ) {
+    return this.prismaService.erpOrderException.updateMany({
+      where: {
+        shopId,
+        orderSn,
+        exceptionType: { in: exceptionTypes },
+        status: { in: ACTIVE_EXCEPTION_STATUSES },
+      },
+      data: {
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+      },
+    });
   }
 
   private async createProcessingJob(jobName: string, payload: unknown) {
@@ -777,9 +1090,16 @@ export class ErpOrdersService {
       : undefined;
   }
 
-  private toDetailItem(item: Parameters<typeof this.toListItem>[0] & { raw?: Prisma.JsonValue | null }) {
+  private orderKey(item: { shopId: string; orderSn: string }) {
+    return `${item.shopId}:${item.orderSn}`;
+  }
+
+  private toDetailItem(
+    item: OrderProjectionDetailRow,
+    enrichment?: OrderEnrichment,
+  ) {
     const raw = this.asRecord(item.raw);
-    const detail = this.toListItem(item);
+    const detail = this.toListItem(item, enrichment);
     return {
       ...detail,
       raw,
@@ -795,25 +1115,13 @@ export class ErpOrdersService {
     };
   }
 
-  private toListItem(item: {
-    id: string;
-    shopId: string;
-    orderSn: string;
-    orderStatus: string;
-    fulfillmentStage: string;
-    packageNumber: string | null;
-    packageStatus: string | null;
-    logisticsStatus: string | null;
-    shippingCarrier: string | null;
-    shippingDocumentStatus: string | null;
-    shippingDocumentType: string | null;
-    buyerUsername: string | null;
-    totalAmount: Prisma.Decimal | null;
-    currency: string | null;
-    createTime: Date | null;
-    updateTime: Date | null;
-    lastSyncedAt: Date;
-  }) {
+  private toListItem(item: OrderProjectionListRow, enrichment?: OrderEnrichment) {
+    const latestException = enrichment?.latestException;
+    const exceptionTag = latestException
+      ? this.mapExceptionTag(latestException.exceptionType)
+      : undefined;
+    const exceptionTags = exceptionTag ? [exceptionTag] : [];
+    const exceptionStatus = latestException?.status ?? 'RESOLVED';
     const packageInfo = item.packageNumber
       ? [
           {
@@ -902,13 +1210,27 @@ export class ErpOrdersService {
       logisticsCompany: item.shippingCarrier ?? '-',
       trackingNo: '-',
       tags: [],
-      exceptionTags: [],
-      hitRuleCodes: [],
-      hitRuleNames: [],
-      exceptionReason: '',
-      riskLevel: 'LOW',
-      suggestedAction: '-',
-      currentStatus: 'PENDING_REVIEW',
+      exceptionType: latestException?.exceptionType,
+      latestException: latestException
+        ? {
+            ...latestException,
+            createdAt: latestException.createdAt.toISOString(),
+            resolvedAt: latestException.resolvedAt?.toISOString(),
+          }
+        : undefined,
+      stageHistory: (enrichment?.stageHistory ?? []).map((history) => ({
+        ...history,
+        createdAt: history.createdAt.toISOString(),
+      })),
+      exceptionTags,
+      hitRuleCodes: latestException ? [latestException.source] : [],
+      hitRuleNames: latestException ? [latestException.source] : [],
+      exceptionReason: latestException?.message ?? '',
+      riskLevel: latestException?.severity ?? 'LOW',
+      suggestedAction: latestException
+        ? this.suggestExceptionAction(latestException.exceptionType)
+        : '-',
+      currentStatus: this.mapExceptionStatus(exceptionStatus),
       orderTime: item.createTime?.toISOString() ?? '',
       remark: '',
       locked: false,
@@ -941,6 +1263,30 @@ export class ErpOrdersService {
       shippingDocumentStatus: item.shippingDocumentStatus ?? undefined,
       shippingDocumentType: item.shippingDocumentType ?? undefined,
     };
+  }
+
+  private mapExceptionTag(exceptionType: string) {
+    if (exceptionType === 'address_invalid') return 'ADDRESS_EXCEPTION';
+    if (exceptionType === 'inventory_shortage') return 'OUT_OF_STOCK';
+    if (exceptionType === 'timeout') return 'TIMEOUT';
+    return 'SYNC_FAILED';
+  }
+
+  private mapExceptionStatus(status: string) {
+    if (status === 'MANUAL_REVIEW') return 'MANUAL_REVIEW';
+    if (status === 'RECHECKING') return 'RECHECKING';
+    if (status === 'IGNORED') return 'IGNORED';
+    if (status === 'RESOLVED') return 'RESOLVED';
+    return 'PENDING_REVIEW';
+  }
+
+  private suggestExceptionAction(exceptionType: string) {
+    if (exceptionType === 'label_failed') return '重新生成面单或同步面单结果';
+    if (exceptionType === 'logistics_blocked') return '检查发货参数后重新安排发货';
+    if (exceptionType === 'sync_failed') return '重新同步订单详情';
+    if (exceptionType === 'inventory_shortage') return '补货或重新分配仓库';
+    if (exceptionType === 'address_invalid') return '核对买家地址';
+    return '人工复核';
   }
 
   private optionalString(input: unknown): string | undefined {

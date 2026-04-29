@@ -4,7 +4,6 @@ import {
   deleteRule,
   mockGetOrderDetail,
   mockGetRuleDetail,
-  mockQueryAbnormalOrders,
   mockQueryAfterSales,
   mockQueryLogisticsOrders,
   mockQueryLogs,
@@ -105,11 +104,13 @@ export async function queryOrders(params: ERP.OrderQueryParams) {
 }
 
 export async function queryAbnormalOrders(params: ERP.OrderQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<ERP.OrderListItem>>(
-    '/api/abnormal-orders',
+  const response = await requestStrict<API.ListResponse<ERP.OrderListItem>>(
+    '/api/erp/orders',
     'GET',
-    () => mockQueryAbnormalOrders(params),
-    params,
+    {
+      ...params,
+      hasActiveException: true,
+    },
   );
   return normalizeOrderListResponse(response);
 }
@@ -591,11 +592,23 @@ export const createAfterSale = (payload: ERP.OrderOperationPayload) =>
   postOrderAction('after-sale', payload);
 export const tagOrders = (payload: ERP.OrderOperationPayload) => postOrderAction('tag', payload);
 export const transferToManual = (payload: ERP.OrderOperationPayload) =>
-  postOrderAction('manual-review', payload);
+  requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
+    '/api/erp/orders/exceptions/manual-review',
+    'POST',
+    payload,
+  );
 export const recheckAbnormalOrders = (payload: ERP.OrderOperationPayload) =>
-  postOrderAction('recheck', payload);
+  requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
+    '/api/erp/orders/exceptions/recheck',
+    'POST',
+    payload,
+  );
 export const ignoreAbnormalOrders = (payload: ERP.OrderOperationPayload) =>
-  postOrderAction('ignore-abnormal', payload);
+  requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
+    '/api/erp/orders/exceptions/ignore',
+    'POST',
+    payload,
+  );
 
 export function getShippingDocumentDownloadUrl(
   packageNumber?: string,

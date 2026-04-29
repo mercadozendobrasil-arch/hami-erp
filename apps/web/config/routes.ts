@@ -66,6 +66,22 @@ export default [
     ],
   },
   {
+    path: '/system',
+    name: 'system',
+    icon: 'setting',
+    routes: [
+      {
+        path: '/system',
+        redirect: '/system/admin',
+      },
+      {
+        path: '/system/admin',
+        name: 'system-admin',
+        component: './system/admin',
+      },
+    ],
+  },
+  {
     path: '/shop',
     name: 'shop',
     icon: 'shop',
@@ -101,10 +117,47 @@ export default [
         component: './product/list',
       },
       {
+        path: '/product/sku-mappings',
+        name: 'product-sku-mappings',
+        component: './product/sku-mappings',
+      },
+      {
         path: '/product/create',
         name: 'product-create',
         hideInMenu: true,
         component: './product/create',
+      },
+    ],
+  },
+  {
+    path: '/inventory',
+    name: 'inventory',
+    icon: 'database',
+    routes: [
+      {
+        path: '/inventory',
+        redirect: '/inventory/stock',
+      },
+      {
+        path: '/inventory/stock',
+        name: 'inventory-stock',
+        component: './inventory/stock',
+      },
+    ],
+  },
+  {
+    path: '/purchase',
+    name: 'purchase',
+    icon: 'shoppingCart',
+    routes: [
+      {
+        path: '/purchase',
+        redirect: '/purchase/orders',
+      },
+      {
+        path: '/purchase/orders',
+        name: 'purchase-orders',
+        component: './purchase/orders',
       },
     ],
   },
@@ -121,6 +174,11 @@ export default [
         path: '/reports/metabase',
         name: 'metabase-reports',
         component: './reports/metabase',
+      },
+      {
+        path: '/reports/finance',
+        name: 'finance-reports',
+        component: './reports/finance',
       },
     ],
   },

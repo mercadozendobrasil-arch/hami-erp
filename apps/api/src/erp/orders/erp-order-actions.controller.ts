@@ -4,6 +4,7 @@ import {
   ErpOrderAfterSaleDto,
   ErpOrderAuditDto,
   ErpOrderCancelDto,
+  ErpOrderExceptionBatchDto,
   ErpOrderLockDto,
   ErpOrderLogisticsDto,
   ErpOrderMergeDto,
@@ -88,5 +89,25 @@ export class ErpOrderActionsController {
   @Post('merge')
   mergeOrders(@Body() payload: ErpOrderMergeDto) {
     return this.erpOrderActionsService.mergeOrders(payload);
+  }
+
+  @Post('exceptions/manual-review')
+  transferExceptionsToManualReview(@Body() payload: ErpOrderExceptionBatchDto) {
+    return this.erpOrderActionsService.transferExceptionsToManualReview(payload);
+  }
+
+  @Post('exceptions/recheck')
+  recheckExceptions(@Body() payload: ErpOrderExceptionBatchDto) {
+    return this.erpOrderActionsService.recheckExceptions(payload);
+  }
+
+  @Post('exceptions/ignore')
+  ignoreExceptions(@Body() payload: ErpOrderExceptionBatchDto) {
+    return this.erpOrderActionsService.ignoreExceptions(payload);
+  }
+
+  @Post('exceptions/resolve')
+  resolveExceptions(@Body() payload: ErpOrderExceptionBatchDto) {
+    return this.erpOrderActionsService.resolveExceptions(payload);
   }
 }

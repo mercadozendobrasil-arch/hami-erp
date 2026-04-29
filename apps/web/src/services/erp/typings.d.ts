@@ -111,6 +111,33 @@ declare namespace ERP {
     | 'BLACKLIST_BUYER'
     | 'TIMEOUT';
 
+  type OrderExceptionStatus =
+    | 'OPEN'
+    | 'RECHECKING'
+    | 'MANUAL_REVIEW'
+    | 'IGNORED'
+    | 'RESOLVED';
+
+  type OrderLatestException = {
+    id: string;
+    exceptionType: string;
+    status: OrderExceptionStatus;
+    severity: RiskLevel;
+    message?: string | null;
+    source: string;
+    createdAt: string;
+    resolvedAt?: string | null;
+  };
+
+  type OrderStageHistoryItem = {
+    id: string;
+    fromStage?: string | null;
+    toStage: string;
+    trigger: string;
+    action?: string | null;
+    createdAt: string;
+  };
+
   type OrderActionBinding = {
     actionKey: string;
     label: string;
@@ -232,11 +259,402 @@ declare namespace ERP {
   };
 
   type ProductListItem = {
+    id?: string;
+    productId?: string;
     platformProductId: string;
     title: string;
     status: string;
+    localStatus?: string;
+    shopId?: string;
+    platformShopId?: string;
+    itemId?: string;
+    brand?: string;
+    parentSku?: string;
+    image?: string;
+    skuCount?: number;
+    modelCount?: number;
     stock: number;
     price: string;
+    updatedAt?: string;
+    createTime?: string;
+    lastSyncTime?: string;
+  };
+
+  type ProductSavePayload = {
+    shopId?: string;
+    title: string;
+    description?: string;
+    categoryName?: string;
+    brand?: string;
+    parentSku?: string;
+    currency?: string;
+    price?: number;
+    costPrice?: number;
+    stock?: number;
+    weightKg?: number;
+    widthCm?: number;
+    lengthCm?: number;
+    heightCm?: number;
+    defaultImageUrl?: string;
+    sourceUrl?: string;
+    skus?: Array<{
+      skuCode: string;
+      barcode?: string;
+      optionName?: string;
+      optionValue?: string;
+      price?: number;
+      costPrice?: number;
+      stock?: number;
+    }>;
+  };
+
+  type SkuMappingQueryParams = PageParams & {
+    shopId?: string;
+  };
+
+  type MissingSkuMappingItem = {
+    shopId: string;
+    orderSn: string;
+    buyerUsername?: string;
+    itemId: string;
+    modelId?: string;
+    platformSkuId?: string;
+    platformSkuCode?: string;
+    itemName?: string;
+    modelName?: string;
+    quantity: number;
+    lastSeenAt: string;
+  };
+
+  type BindSkuMappingPayload = {
+    shopId: string;
+    itemId: string;
+    modelId?: string;
+    skuId: string;
+    platformSkuId?: string;
+    skuCode?: string;
+  };
+
+  type ErpSkuQueryParams = PageParams & {
+    keyword?: string;
+  };
+
+  type ErpSkuListItem = {
+    id: string;
+    skuId: string;
+    productId: string;
+    productTitle: string;
+    skuCode: string;
+    barcode?: string | null;
+    optionName?: string | null;
+    optionValue?: string | null;
+    status: string;
+    price?: string;
+    costPrice?: string;
+    stock: number;
+    updatedAt?: string;
+  };
+
+  type WarehouseListItem = {
+    id: string;
+    code: string;
+    name: string;
+    region?: string | null;
+    address?: string | null;
+    contactName?: string | null;
+    contactPhone?: string | null;
+    active: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+
+  type WarehouseSavePayload = {
+    code: string;
+    name: string;
+    region?: string;
+    address?: string;
+    contactName?: string;
+    contactPhone?: string;
+    active?: boolean;
+  };
+
+  type InventoryQueryParams = PageParams & {
+    warehouseId?: string;
+    keyword?: string;
+  };
+
+  type InventoryBalanceItem = {
+    id: string;
+    warehouseId: string;
+    warehouseCode: string;
+    warehouseName: string;
+    skuId: string;
+    skuCode: string;
+    barcode?: string | null;
+    productId: string;
+    productTitle: string;
+    skuStock: number;
+    onHand: number;
+    locked: number;
+    salable: number;
+    safetyStock: number;
+    updatedAt: string;
+  };
+
+  type InventoryAdjustPayload = {
+    warehouseId: string;
+    skuId: string;
+    quantity: number;
+    safetyStock?: number;
+    movementType?: string;
+    referenceType?: string;
+    referenceId?: string;
+    note?: string;
+  };
+
+  type InventoryReservePayload = {
+    warehouseId: string;
+    skuId: string;
+    quantity: number;
+    orderSn?: string;
+    note?: string;
+  };
+
+  type InventoryReleasePayload = {
+    reservationId: string;
+    note?: string;
+  };
+
+  type SupplierQueryParams = {
+    keyword?: string;
+  };
+
+  type SupplierListItem = {
+    id: string;
+    code: string;
+    name: string;
+    contactName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    taxId?: string | null;
+    currency: string;
+    active: boolean;
+    remark?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+
+  type SupplierSavePayload = {
+    code: string;
+    name: string;
+    contactName?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    taxId?: string;
+    currency?: string;
+    active?: boolean;
+    remark?: string;
+  };
+
+  type PurchaseOrderStatus =
+    | 'DRAFT'
+    | 'SUBMITTED'
+    | 'PARTIALLY_RECEIVED'
+    | 'RECEIVED'
+    | 'CANCELLED';
+
+  type PurchaseOrderQueryParams = PageParams & {
+    status?: string;
+    supplierId?: string;
+    warehouseId?: string;
+    keyword?: string;
+  };
+
+  type PurchaseOrderListItem = {
+    id: string;
+    orderNo: string;
+    supplierId: string;
+    supplierName: string;
+    warehouseId?: string | null;
+    warehouseName?: string | null;
+    status: PurchaseOrderStatus;
+    currency: string;
+    totalAmount?: string;
+    itemCount: number;
+    totalQuantity: number;
+    receivedQuantity: number;
+    expectedArriveAt?: string;
+    submittedAt?: string;
+    receivedAt?: string;
+    remark?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type PurchaseOrderItem = {
+    id: string;
+    skuId: string;
+    skuCode: string;
+    productTitle: string;
+    quantity: number;
+    receivedQuantity: number;
+    unitCost?: string;
+    totalCost?: string;
+    status: string;
+    remark?: string | null;
+  };
+
+  type PurchaseOrderDetail = PurchaseOrderListItem & {
+    items: PurchaseOrderItem[];
+  };
+
+  type PurchaseOrderSavePayload = {
+    supplierId: string;
+    warehouseId?: string;
+    expectedArriveAt?: string;
+    currency?: string;
+    remark?: string;
+    items: Array<{
+      skuId: string;
+      quantity: number;
+      unitCost?: number;
+      remark?: string;
+    }>;
+  };
+
+  type PurchaseReceivePayload = {
+    warehouseId: string;
+    note?: string;
+    items: Array<{
+      itemId: string;
+      quantity: number;
+    }>;
+  };
+
+  type FinanceQueryParams = PageParams & {
+    shopId?: string;
+    keyword?: string;
+    startDate?: string;
+    endDate?: string;
+  };
+
+  type FinanceSummary = {
+    orderCount: number;
+    missingCostCount: number;
+    revenue: string;
+    productCost: string;
+    platformFee: string;
+    logisticsFee: string;
+    otherFee: string;
+    grossProfit: string;
+    grossMarginRate?: string | null;
+  };
+
+  type OrderProfitItem = {
+    id: string;
+    shopId: string;
+    orderSn: string;
+    currency: string;
+    revenue: string;
+    productCost: string;
+    platformFee: string;
+    logisticsFee: string;
+    otherFee: string;
+    grossProfit: string;
+    grossMarginRate?: string;
+    estimated: boolean;
+    missingCost: boolean;
+    calculatedAt: string;
+  };
+
+  type FinanceRebuildPayload = {
+    shopId?: string;
+    limit?: number;
+  };
+
+  type SystemPageParams = PageParams & {
+    keyword?: string;
+    status?: string;
+  };
+
+  type SystemPermissionItem = {
+    code: string;
+    module: string;
+    action: string;
+  };
+
+  type SystemRoleItem = {
+    id: string;
+    code: string;
+    name: string;
+    description?: string | null;
+    permissions: string[];
+    active: boolean;
+    userCount?: number;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+
+  type SystemRoleSavePayload = {
+    code: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    active?: boolean;
+  };
+
+  type SystemUserItem = {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    email?: string | null;
+    active: boolean;
+    roles: Array<{ id: string; code: string; name: string }>;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+
+  type SystemUserSavePayload = {
+    username: string;
+    displayName?: string;
+    email?: string;
+    active?: boolean;
+    roleIds?: string[];
+  };
+
+  type OperationLogQueryParams = SystemPageParams & {
+    module?: string;
+    action?: string;
+  };
+
+  type OperationLogItem = {
+    id: string;
+    module: string;
+    action: string;
+    status: string;
+    resourceId?: string | null;
+    shopId?: string | null;
+    message?: string | null;
+    operatorId?: string | null;
+    actorName?: string | null;
+    createdAt: string;
+  };
+
+  type TaskLogQueryParams = SystemPageParams & {
+    queueName?: string;
+  };
+
+  type TaskLogItem = {
+    id: string;
+    queueName: string;
+    jobName: string;
+    status: string;
+    errorMessage?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    processedAt?: string | null;
   };
 
   type MetabaseEmbedConfig = {
@@ -352,6 +770,9 @@ declare namespace ERP {
     logisticsCompany: string;
     trackingNo: string;
     tags: OrderExceptionTag[];
+    exceptionType?: string;
+    latestException?: OrderLatestException;
+    stageHistory?: OrderStageHistoryItem[];
     exceptionTags: OrderExceptionTag[];
     hitRuleCodes: string[];
     hitRuleNames: string[];
@@ -718,6 +1139,9 @@ declare namespace ERP {
     riskLevel?: RiskLevel;
     suggestedAction?: string;
     exceptionTag?: OrderExceptionTag;
+    exceptionType?: string;
+    exceptionStatus?: OrderExceptionStatus;
+    hasActiveException?: boolean;
     hitRuleCode?: string;
     exceptionReason?: string;
     currentStatus?: AbnormalCurrentStatus;
@@ -769,6 +1193,10 @@ declare namespace ERP {
 
   type OrderOperationPayload = {
     orderIds?: string[];
+    orders?: Array<{
+      shopId: string;
+      orderSn: string;
+    }>;
     orderId?: string;
     orderNo?: string;
     orderSn?: string;

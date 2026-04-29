@@ -63,7 +63,10 @@ function buildDefaultColumnState(columns: ProColumns<ERP.OrderListItem>[]) {
     }
     acc[key] = {
       show: !column.hideInTable,
-      fixed: column.fixed,
+      fixed:
+        column.fixed === 'left' || column.fixed === 'right'
+          ? column.fixed
+          : undefined,
     };
     return acc;
   }, {});
@@ -155,8 +158,8 @@ const OrderTable: React.FC<OrderTableProps> = ({
   };
 
   const columns = useMemo<ProColumns<ERP.OrderListItem>[]>(
-    () =>
-      [
+    () => {
+      const baseColumns: ProColumns<ERP.OrderListItem>[] = [
         {
           title: '订单号',
           dataIndex: 'orderNo',
@@ -382,7 +385,6 @@ const OrderTable: React.FC<OrderTableProps> = ({
           width: 320,
           fixed: 'right',
           hideInTable: hideActions,
-          hideInSearch: true,
           hideInSetting: hideActions,
           render: (_, record) => (
             <Space size={4} wrap>
@@ -408,7 +410,12 @@ const OrderTable: React.FC<OrderTableProps> = ({
             </Space>
           ),
         },
-      ].filter((column) => !(hideActions && column.dataIndex === 'actions')),
+      ];
+
+      return baseColumns.filter(
+        (column) => !(hideActions && column.dataIndex === 'actions'),
+      );
+    },
     [currentTab, hideActions],
   );
   const defaultColumnState = useMemo(

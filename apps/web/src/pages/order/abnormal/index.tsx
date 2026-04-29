@@ -56,7 +56,12 @@ const AbnormalOrderPage: React.FC = () => {
       title,
       content,
       onOk: async () => {
-        await handler({ orderIds: selectedRows.map((item) => item.id) });
+        await handler({
+          orders: selectedRows.map((item) => ({
+            shopId: item.platformShopId,
+            orderSn: item.orderSn,
+          })),
+        });
         message.success(successText);
         actionRef.current?.reloadAndRest?.();
       },

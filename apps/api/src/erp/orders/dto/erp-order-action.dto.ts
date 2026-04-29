@@ -38,6 +38,24 @@ export class ErpOrderShopActionDto {
   shopId!: string;
 }
 
+export class ErpOrderExceptionTargetDto extends ErpOrderShopActionDto {
+  @IsString()
+  orderSn!: string;
+}
+
+export class ErpOrderExceptionBatchDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => ErpOrderExceptionTargetDto)
+  orders!: ErpOrderExceptionTargetDto[];
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class ErpOrderNoteDto extends ErpOrderShopActionDto {
   @IsString()
   remark!: string;

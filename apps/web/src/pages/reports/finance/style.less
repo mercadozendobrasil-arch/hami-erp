@@ -1,0 +1,19 @@
+.erp-finance-page {
+  .erp-content {
+    max-width: 1480px;
+    margin: 0 auto;
+  }
+}
+
+.erp-finance-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 1100px) {
+  .erp-finance-summary {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}

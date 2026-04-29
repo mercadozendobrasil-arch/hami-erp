@@ -7,6 +7,43 @@ export async function queryProducts(params: ERP.PageParams) {
   });
 }
 
+export async function createErpProduct(payload: ERP.ProductSavePayload) {
+  return request<ERP.ApiResponse<ERP.ProductListItem>>('/api/erp/products', {
+    method: 'POST',
+    data: payload,
+  });
+}
+
+export async function queryMissingSkuMappings(params: ERP.SkuMappingQueryParams) {
+  return request<API.ListResponse<ERP.MissingSkuMappingItem>>(
+    '/api/erp/products/sku-mappings/missing',
+    {
+      method: 'GET',
+      params,
+    },
+  );
+}
+
+export async function bindSkuMapping(payload: ERP.BindSkuMappingPayload) {
+  return request<ERP.ApiResponse<Record<string, unknown>>>(
+    '/api/erp/products/sku-mappings/bind',
+    {
+      method: 'POST',
+      data: payload,
+    },
+  );
+}
+
+export async function queryErpSkus(params: ERP.ErpSkuQueryParams) {
+  return request<API.ListResponse<ERP.ErpSkuListItem>>(
+    '/api/erp/products/skus',
+    {
+      method: 'GET',
+      params,
+    },
+  );
+}
+
 export async function getProductDetail(itemId: string, shopId: string) {
   return request<ERP.ApiResponse<ERP.ProductListItem>>(
     `/api/erp/products/${itemId}`,
