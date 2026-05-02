@@ -9,5 +9,7 @@ describe('ErpModule', () => {
 
     expect(source).toContain('ErpDashboardController');
     expect(source).toContain('ErpSyncLogsController');
+    expect(source).toContain('ErpFiscalController');
+    expect(source).toContain('ErpFiscalService');
   });
 });

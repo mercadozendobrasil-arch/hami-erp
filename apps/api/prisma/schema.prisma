@@ -84,6 +84,40 @@ enum ErpPurchaseItemStatus {
   CANCELLED
 }
 
+enum ErpFiscalProvider {
+  NUVEM_FISCAL
+}
+
+enum ErpFiscalDocumentType {
+  NFE
+  NFCE
+  NFSE
+  CTE
+  MDFE
+  DCE
+}
+
+enum ErpFiscalDocumentStatus {
+  DRAFT
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  CANCELLED
+  FAILED
+  UNKNOWN
+}
+
+enum ErpFiscalEventType {
+  ISSUE
+  SYNC
+  DOWNLOAD_XML
+  DOWNLOAD_PDF
+  CANCEL
+  CORRECTION
+  WEBHOOK
+  MANUAL_UPDATE
+}
+
 model ShopeeShop {
   id        String         @id @default(cuid())
   shopId    BigInt         @unique
@@ -581,6 +615,79 @@ model ErpPurchaseOrderItem {
   @@index([purchaseOrderId])
   @@index([skuId])
   @@index([status])
+}
+
+model ErpFiscalCompanyConfig {
+  id             String            @id @default(cuid())
+  provider       ErpFiscalProvider @default(NUVEM_FISCAL)
+  shopId         String
+  cpfCnpj        String
+  companyName    String?
+  environment    String            @default("sandbox")
+  enabledServices Json?
+  providerStatus String?
+  raw            Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([provider, shopId, cpfCnpj, environment])
+  @@index([shopId])
+  @@index([cpfCnpj])
+  @@index([providerStatus])
+  @@index([createdAt])
+}
+
+model ErpFiscalDocument {
+  id                 String                  @id @default(cuid())
+  provider           ErpFiscalProvider       @default(NUVEM_FISCAL)
+  type               ErpFiscalDocumentType
+  status             ErpFiscalDocumentStatus @default(DRAFT)
+  shopId             String
+  orderSn            String?
+  providerDocumentId String?
+  accessKey          String?
+  number             String?
+  series             String?
+  issueDate          DateTime?
+  totalAmount        Decimal?                @db.Decimal(18, 2)
+  currency           String                  @default("BRL")
+  xmlAvailable       Boolean                 @default(false)
+  pdfAvailable       Boolean                 @default(false)
+  lastSyncedAt       DateTime?
+  raw                Json?
+  errorMessage       String?
+  jobRecordId        String?
+  events             ErpFiscalEvent[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([shopId])
+  @@index([shopId, orderSn])
+  @@index([provider, providerDocumentId])
+  @@index([accessKey])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([jobRecordId])
+}
+
+model ErpFiscalEvent {
+  id               String             @id @default(cuid())
+  fiscalDocument   ErpFiscalDocument? @relation(fields: [fiscalDocumentId], references: [id], onDelete: Cascade)
+  fiscalDocumentId String?
+  eventType        ErpFiscalEventType
+  status           String
+  request          Json?
+  response         Json?
+  errorMessage     String?
+  jobRecordId      String?
+  createdAt        DateTime           @default(now())
+
+  @@index([fiscalDocumentId])
+  @@index([eventType])
+  @@index([status])
+  @@index([jobRecordId])
+  @@index([createdAt])
 }
 
 model ErpOrderOperationLog {

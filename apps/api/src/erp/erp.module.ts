@@ -4,6 +4,8 @@ import { ErpDashboardController } from './dashboard/erp-dashboard.controller';
 import { ErpDashboardService } from './dashboard/erp-dashboard.service';
 import { ErpFinanceController } from './finance/erp-finance.controller';
 import { ErpFinanceService } from './finance/erp-finance.service';
+import { ErpFiscalController } from './fiscal/erp-fiscal.controller';
+import { ErpFiscalService } from './fiscal/erp-fiscal.service';
 import { ErpInventoryController } from './inventory/erp-inventory.controller';
 import { ErpInventoryService } from './inventory/erp-inventory.service';
 import { ErpJobsController } from './jobs/erp-jobs.controller';
@@ -31,6 +33,7 @@ import { ErpSystemService } from './system/erp-system.service';
     ErpInventoryController,
     ErpPurchasesController,
     ErpFinanceController,
+    ErpFiscalController,
     ErpSyncLogsController,
     ErpSystemController,
   ],
@@ -43,6 +46,7 @@ import { ErpSystemService } from './system/erp-system.service';
     ErpInventoryService,
     ErpPurchasesService,
     ErpFinanceService,
+    ErpFiscalService,
     ErpSyncLogsService,
     ErpSystemService,
   ],

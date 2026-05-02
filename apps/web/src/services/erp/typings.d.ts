@@ -574,6 +574,87 @@ declare namespace ERP {
     limit?: number;
   };
 
+  type FiscalDocumentType = 'NFE' | 'NFCE' | 'NFSE' | 'CTE' | 'MDFE' | 'DCE';
+
+  type FiscalDocumentStatus =
+    | 'DRAFT'
+    | 'PROCESSING'
+    | 'AUTHORIZED'
+    | 'REJECTED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'UNKNOWN';
+
+  type FiscalHealth = {
+    provider: 'NUVEM_FISCAL';
+    environment: 'sandbox' | 'production';
+    scopes: string[];
+    credentialsConfigured: boolean;
+  };
+
+  type FiscalAddress = {
+    cep: string;
+    street?: string;
+    district?: string;
+    city?: string;
+    state?: string;
+    raw?: Record<string, unknown>;
+  };
+
+  type FiscalCompanyLookup = {
+    cnpj: string;
+    legalName?: string;
+    tradeName?: string;
+    status?: string;
+    state?: string;
+    city?: string;
+    raw?: Record<string, unknown>;
+  };
+
+  type FiscalDocumentQueryParams = PageParams & {
+    shopId?: string;
+    orderSn?: string;
+    type?: FiscalDocumentType;
+    status?: FiscalDocumentStatus;
+    keyword?: string;
+    startDate?: string;
+    endDate?: string;
+  };
+
+  type FiscalDocumentEvent = {
+    id: string;
+    eventType: string;
+    status: string;
+    errorMessage?: string | null;
+    createdAt: string;
+  };
+
+  type FiscalDocumentItem = {
+    id: string;
+    provider: 'NUVEM_FISCAL';
+    type: FiscalDocumentType;
+    status: FiscalDocumentStatus;
+    shopId: string;
+    orderSn?: string | null;
+    providerDocumentId?: string | null;
+    accessKey?: string | null;
+    number?: string | null;
+    series?: string | null;
+    issueDate?: string;
+    totalAmount?: string;
+    currency: string;
+    xmlAvailable: boolean;
+    pdfAvailable: boolean;
+    lastSyncedAt?: string;
+    errorMessage?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type FiscalDocumentDetail = FiscalDocumentItem & {
+    events: FiscalDocumentEvent[];
+  };
+
   type SystemPageParams = PageParams & {
     keyword?: string;
     status?: string;
