@@ -74,14 +74,7 @@ describe('ErpFiscalService', () => {
     });
   });
 
-  it('normalizes CEP lookup responses', async () => {
-    fiscalHttp.get.mockResolvedValue({
-      cep: '01001000',
-      logradouro: 'Praca da Se',
-      bairro: 'Se',
-      municipio: 'Sao Paulo',
-      uf: 'SP',
-    });
+  it('rejects Nuvem-only lookup endpoints while Focus NFe is the active provider', async () => {
     const service = new ErpFiscalService(
       configService,
       focusNfeHttp,
@@ -89,62 +82,19 @@ describe('ErpFiscalService', () => {
       prismaService as never,
     );
 
-    await expect(service.lookupCep('01001-000')).resolves.toEqual({
-      success: true,
-      data: {
-        cep: '01001000',
-        street: 'Praca da Se',
-        district: 'Se',
-        city: 'Sao Paulo',
-        state: 'SP',
-        raw: {
-          cep: '01001000',
-          logradouro: 'Praca da Se',
-          bairro: 'Se',
-          municipio: 'Sao Paulo',
-          uf: 'SP',
-        },
-      },
-    });
-    expect(fiscalHttp.get).toHaveBeenCalledWith('/cep/01001000');
-  });
-
-  it('normalizes CNPJ lookup responses', async () => {
-    fiscalHttp.get.mockResolvedValue({
-      cnpj: '11222333000181',
-      razao_social: 'Empresa Teste LTDA',
-      nome_fantasia: 'Empresa Teste',
-      situacao_cadastral: 'ATIVA',
-      uf: 'SP',
-      municipio: 'Sao Paulo',
-    });
-    const service = new ErpFiscalService(
-      configService,
-      focusNfeHttp,
-      fiscalHttp,
-      prismaService as never,
+    await expect(service.lookupCep('01001-000')).rejects.toThrow(
+      'Fiscal lookup cep is not available for Focus NFe.',
     );
-
-    await expect(service.lookupCnpj('11.222.333/0001-81')).resolves.toEqual({
-      success: true,
-      data: {
-        cnpj: '11222333000181',
-        legalName: 'Empresa Teste LTDA',
-        tradeName: 'Empresa Teste',
-        status: 'ATIVA',
-        state: 'SP',
-        city: 'Sao Paulo',
-        raw: {
-          cnpj: '11222333000181',
-          razao_social: 'Empresa Teste LTDA',
-          nome_fantasia: 'Empresa Teste',
-          situacao_cadastral: 'ATIVA',
-          uf: 'SP',
-          municipio: 'Sao Paulo',
-        },
-      },
-    });
-    expect(fiscalHttp.get).toHaveBeenCalledWith('/cnpj/11222333000181');
+    await expect(service.lookupCnpj('11.222.333/0001-81')).rejects.toThrow(
+      'Fiscal lookup cnpj is not available for Focus NFe.',
+    );
+    await expect(service.listQuotas()).rejects.toThrow(
+      'Fiscal quota lookup is not available for Focus NFe.',
+    );
+    await expect(service.getCompany('11.222.333/0001-81')).rejects.toThrow(
+      'Fiscal company lookup is not available for Focus NFe.',
+    );
+    expect(fiscalHttp.get).not.toHaveBeenCalled();
   });
 
   it('lists local fiscal documents with ERP pagination shape', async () => {

@@ -188,74 +188,83 @@ describe('InvoiceSdk', () => {
 });
 
 describe('ErpOrdersService auto invoice workflow', () => {
-  it('issues invoice, registers it with Shopee, creates the shipping document task, and marks the order waiting for pickup preparation', async () => {
-    const prismaService = {
-      erpOrderProjection: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: 'projection-1',
-          shopId: '123',
-          orderSn: 'ORDER-1',
-          fulfillmentStage: 'pending_invoice',
-          orderStatus: 'READY_TO_SHIP',
-          packageNumber: 'PKG-1',
-          shippingDocumentType: 'NORMAL_AIR_WAYBILL',
-          totalAmount: new Prisma.Decimal('199.90'),
-          currency: 'BRL',
-          raw: { item_list: [{ item_id: 1 }] },
-        }),
-        update: jest.fn().mockResolvedValue({
-          id: 'projection-1',
-          fulfillmentStage: 'pending_print',
-        }),
-      },
-      jobRecord: {
-        create: jest.fn().mockResolvedValue({ id: 'job-print' }),
-        update: jest.fn().mockResolvedValue({ id: 'job-print' }),
-      },
-      erpShippingLabelRecord: {
-        create: jest.fn().mockResolvedValue({ id: 'label-1' }),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-      erpOrderOperationLog: {
-        create: jest.fn().mockResolvedValue({ id: 'log-1' }),
-      },
-      erpOrderStageHistory: {
-        create: jest.fn().mockResolvedValue({ id: 'stage-1' }),
-      },
-      erpOrderException: {
-        create: jest.fn(),
-      },
-      $transaction: jest.fn((operations: unknown[]) => Promise.all(operations)),
-    };
-    const orderSdk = {
-      createShippingDocument: jest.fn().mockResolvedValue({
-        request_id: 'label-req',
-        response: { success: true },
+  const buildPrismaService = () => ({
+    erpOrderProjection: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'projection-1',
+        shopId: '123',
+        orderSn: 'ORDER-1',
+        fulfillmentStage: 'pending_invoice',
+        orderStatus: 'READY_TO_SHIP',
+        packageNumber: 'PKG-1',
+        shippingDocumentType: 'NORMAL_AIR_WAYBILL',
+        totalAmount: new Prisma.Decimal('199.90'),
+        currency: 'BRL',
+        raw: { item_list: [{ item_id: 1 }] },
       }),
-    };
-    const fiscalService = {
-      issueOrderInvoice: jest.fn().mockResolvedValue({
-        success: true,
-        data: {
-          document: {
-            id: 'doc-1',
-            providerDocumentId: 'nf-123',
-            accessKey: 'key-1',
-            number: '10',
-            series: '1',
-            xmlAvailable: true,
-            pdfAvailable: true,
-          },
-          raw: { id: 'nf-123' },
+      update: jest.fn().mockResolvedValue({
+        id: 'projection-1',
+        fulfillmentStage: 'pending_print',
+      }),
+    },
+    jobRecord: {
+      create: jest.fn().mockResolvedValue({ id: 'job-print' }),
+      update: jest.fn().mockResolvedValue({ id: 'job-print' }),
+    },
+    erpShippingLabelRecord: {
+      create: jest.fn().mockResolvedValue({ id: 'label-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    erpOrderOperationLog: {
+      create: jest.fn().mockResolvedValue({ id: 'log-1' }),
+    },
+    erpOrderStageHistory: {
+      create: jest.fn().mockResolvedValue({ id: 'stage-1' }),
+    },
+    erpOrderException: {
+      create: jest.fn().mockResolvedValue({ id: 'exception-1' }),
+    },
+    $transaction: jest.fn((operations: unknown[]) => Promise.all(operations)),
+  });
+
+  const buildOrderSdk = () => ({
+    createShippingDocument: jest.fn().mockResolvedValue({
+      request_id: 'label-req',
+      response: { success: true },
+    }),
+  });
+
+  const buildFiscalService = (status = 'AUTHORIZED') => ({
+    issueOrderInvoice: jest.fn().mockResolvedValue({
+      success: true,
+      data: {
+        document: {
+          id: 'doc-1',
+          status,
+          providerDocumentId: 'nf-123',
+          accessKey: 'key-1',
+          number: '10',
+          series: '1',
+          xmlAvailable: status === 'AUTHORIZED',
+          pdfAvailable: status === 'AUTHORIZED',
         },
-      }),
-    };
-    const invoiceSdk = {
-      registerInvoice: jest.fn().mockResolvedValue({
-        request_id: 'invoice-req',
-        response: { success: true },
-      }),
-    };
+        raw: { id: 'nf-123', status },
+      },
+    }),
+  });
+
+  const buildInvoiceSdk = () => ({
+    registerInvoice: jest.fn().mockResolvedValue({
+      request_id: 'invoice-req',
+      response: { success: true },
+    }),
+  });
+
+  it('issues invoice, registers it with Shopee, creates the shipping document task, and marks the order waiting for pickup preparation', async () => {
+    const prismaService = buildPrismaService();
+    const orderSdk = buildOrderSdk();
+    const fiscalService = buildFiscalService();
+    const invoiceSdk = buildInvoiceSdk();
     const service = new (ErpOrdersService as any)(
       prismaService,
       orderSdk,
@@ -302,7 +311,7 @@ describe('ErpOrdersService auto invoice workflow', () => {
       series: '1',
       xmlAvailable: true,
       pdfAvailable: true,
-      raw: { id: 'nf-123' },
+      raw: expect.objectContaining({ id: 'nf-123' }),
     });
     expect(orderSdk.createShippingDocument).toHaveBeenCalledWith('123', [
       {
@@ -322,6 +331,46 @@ describe('ErpOrdersService auto invoice workflow', () => {
         invoiceStatus: 'AUTHORIZED',
         fulfillmentStage: 'pending_print',
       },
+    });
+  });
+
+  it('does not register the invoice or create the shipping document until Focus authorizes the invoice', async () => {
+    const prismaService = buildPrismaService();
+    const orderSdk = buildOrderSdk();
+    const fiscalService = buildFiscalService('PROCESSING');
+    const invoiceSdk = buildInvoiceSdk();
+    const service = new (ErpOrdersService as any)(
+      prismaService,
+      orderSdk,
+      fiscalService,
+      invoiceSdk,
+    );
+
+    await expect(
+      service.autoInvoiceOrder('ORDER-1', {
+        shopId: '123',
+        type: 'NFE',
+      }),
+    ).rejects.toThrow('Fiscal invoice is PROCESSING');
+
+    expect(invoiceSdk.registerInvoice).not.toHaveBeenCalled();
+    expect(orderSdk.createShippingDocument).not.toHaveBeenCalled();
+    expect(prismaService.erpOrderProjection.update).not.toHaveBeenCalled();
+    expect(prismaService.erpOrderException.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        shopId: '123',
+        orderSn: 'ORDER-1',
+        exceptionType: 'invoice_not_authorized',
+        source: 'AUTO_INVOICE',
+      }),
+    });
+    expect(prismaService.erpOrderOperationLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        shopId: '123',
+        orderSn: 'ORDER-1',
+        action: 'AUTO_INVOICE',
+        status: 'BLOCKED',
+      }),
     });
   });
 });

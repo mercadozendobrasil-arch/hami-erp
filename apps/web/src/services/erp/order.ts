@@ -373,6 +373,42 @@ export async function queryDashboardSummary() {
 }
 
 export async function addInvoiceData(payload: ERP.OrderOperationPayload) {
+  return autoInvoiceOrder(payload);
+}
+
+export async function autoInvoiceOrder(payload: ERP.OrderOperationPayload) {
+  const orderSn = payload.orderSn || payload.orderNo || payload.orderId;
+  if (!orderSn) {
+    throw new Error('Missing orderSn for auto invoice.');
+  }
+  if (!payload.shopId) {
+    throw new Error('Missing shopId for auto invoice.');
+  }
+
+  const response = await requestStrict<
+    ERP.ApiResponse<{
+      fiscalDocumentId: string;
+      shopeeInvoiceResult?: Record<string, unknown>;
+      shippingDocumentJobId?: string;
+      labelIds?: string[];
+      nextStage?: string;
+      nextAction?: string;
+    }>
+  >(`/api/erp/orders/${orderSn}/auto-invoice`, 'POST', {
+    shopId: payload.shopId,
+    type: 'NFE',
+    packageNumber: payload.packageNumber,
+    shippingDocumentType: payload.shippingDocumentType,
+  });
+
+  if (response.success === false) {
+    throw new Error(response.errorMessage || 'Auto invoice failed.');
+  }
+
+  return response.data;
+}
+
+export async function addManualInvoiceData(payload: ERP.OrderOperationPayload) {
   const response = await requestWithFallback<ERP.ApiResponse<Record<string, unknown>>>(
     '/api/shopee/orders/invoice/add',
     'POST',

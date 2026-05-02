@@ -58,6 +58,7 @@ export class ErpFiscalService {
   }
 
   async lookupCep(cep: string) {
+    this.assertFocusUnsupported('lookup cep');
     const normalizedCep = this.onlyDigits(cep);
     const raw = await this.nuvemFiscalHttpService.get<Record<string, unknown>>(
       `/cep/${normalizedCep}`,
@@ -74,6 +75,7 @@ export class ErpFiscalService {
   }
 
   async lookupCnpj(cnpj: string) {
+    this.assertFocusUnsupported('lookup cnpj');
     const normalizedCnpj = this.onlyDigits(cnpj);
     const raw = await this.nuvemFiscalHttpService.get<Record<string, unknown>>(
       `/cnpj/${normalizedCnpj}`,
@@ -91,10 +93,12 @@ export class ErpFiscalService {
   }
 
   async listQuotas() {
+    this.assertFocusUnsupported('quota lookup');
     return erpData(await this.nuvemFiscalHttpService.get('/conta/cotas'));
   }
 
   async getCompany(cpfCnpj: string) {
+    this.assertFocusUnsupported('company lookup');
     const normalizedCpfCnpj = this.onlyDigits(cpfCnpj);
     return erpData(
       await this.nuvemFiscalHttpService.get(`/empresas/${normalizedCpfCnpj}`),
@@ -302,6 +306,12 @@ export class ErpFiscalService {
 
   private onlyDigits(input: string) {
     return input.replace(/\D/g, '');
+  }
+
+  private assertFocusUnsupported(feature: string): never {
+    throw new ConflictException(
+      `Fiscal ${feature} is not available for Focus NFe.`,
+    );
   }
 
   private optionalString(input: unknown): string | undefined {

@@ -7,11 +7,11 @@ import {
 import { Button, Form, Input, Modal, message, Space, Tooltip } from 'antd';
 import React, { useMemo, useState } from 'react';
 import {
-  addInvoiceData,
   arrangeShipment,
   arrangeShipmentMass,
   assignWarehouse,
   auditOrders,
+  autoInvoiceOrder,
   cancelOrders,
   createAfterSale,
   lockOrders,
@@ -329,8 +329,13 @@ const OrderActionModals: React.FC<OrderActionModalsProps> = ({
     <>
       {contextHolder}
       <Space wrap>
-        {renderActionButton('invoice', '补发票信息', () =>
-          setModalType('invoice'),
+        {renderActionButton('invoice', '自动开票', () =>
+          openConfirm(
+            '自动开票',
+            `确认自动开票并回传 Shopee，生成 ${targetCount} 条订单的面单任务吗？`,
+            autoInvoiceOrder,
+            '自动开票任务已提交，等待 Shopee 生成面单',
+          ),
         )}
         {renderActionButton('audit', '审核订单', handleAudit)}
         {renderActionButton('reverseAudit', '反审核', () =>
@@ -438,7 +443,7 @@ const OrderActionModals: React.FC<OrderActionModalsProps> = ({
         }}
         onFinish={async (values) => {
           await runAction(
-            addInvoiceData,
+            autoInvoiceOrder,
             {
               invoiceData: {
                 number: values.number,

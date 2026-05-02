@@ -116,7 +116,10 @@ function isShipmentLocked(order: ERP.OrderListItem) {
 }
 
 function isPendingInvoice(order: ERP.OrderListItem) {
-  return order.orderStatus === 'PENDING_INVOICE';
+  return (
+    order.orderStatus === 'PENDING_INVOICE' ||
+    order.fulfillmentStage === 'pending_invoice'
+  );
 }
 
 export function getOrderActionPolicies({
@@ -351,7 +354,7 @@ export function getOrderActionPolicies({
       if (single.orderStatus === 'UNPAID') {
         visible = ['remark', 'manualSync'].includes(key);
       }
-      if (single.orderStatus === 'PENDING_INVOICE') {
+      if (isPendingInvoice(single)) {
         if (!['invoice', 'remark', 'manualSync'].includes(key)) {
           visible = false;
         }

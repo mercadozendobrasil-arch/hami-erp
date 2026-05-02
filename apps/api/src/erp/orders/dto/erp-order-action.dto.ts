@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 class ErpPickupDto {
   @IsOptional()
@@ -40,10 +50,11 @@ export class ErpOrderShopActionDto {
 
 export class ErpAutoInvoiceDto extends ErpOrderShopActionDto {
   @IsOptional()
-  @IsString()
+  @IsIn(['NFE', 'NFCE'])
   type?: string;
 
   @IsOptional()
+  @IsObject()
   payload?: Record<string, unknown>;
 
   @IsOptional()

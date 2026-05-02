@@ -45,7 +45,12 @@ declare namespace ERP {
     | 'CANCEL_PROCESSING'
     | 'CANCELLED'
     | 'RETRY_SHIPMENT'
-    | 'RETURN_PROCESSING';
+    | 'RETURN_PROCESSING'
+    | 'pending_invoice'
+    | 'pending_shipment'
+    | 'pending_print'
+    | 'pending_pickup'
+    | 'shipped';
   type RuleType =
     | 'ADDRESS_VALIDATION'
     | 'RISK_CONTROL'

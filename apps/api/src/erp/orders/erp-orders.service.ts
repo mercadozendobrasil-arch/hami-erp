@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ErpLabelStatus, JobStatus, Prisma } from '@prisma/client';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ErpFiscalDocumentStatus,
+  ErpLabelStatus,
+  JobStatus,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../infra/database/prisma.service';
 import { ErpFiscalService } from '../fiscal/erp-fiscal.service';
@@ -443,6 +448,7 @@ export class ErpOrdersService {
     const fiscalData = fiscalResult.data as {
       document: {
         id: string;
+        status?: string | null;
         providerDocumentId?: string | null;
         accessKey?: string | null;
         number?: string | null;
@@ -453,6 +459,42 @@ export class ErpOrdersService {
       raw?: unknown;
     };
     const document = fiscalData.document;
+    if (document.status !== ErpFiscalDocumentStatus.AUTHORIZED) {
+      const status = document.status ?? ErpFiscalDocumentStatus.UNKNOWN;
+      await this.recordOrderException({
+        shopId: payload.shopId,
+        orderSn,
+        exceptionType: 'invoice_not_authorized',
+        severity:
+          status === ErpFiscalDocumentStatus.REJECTED ||
+          status === ErpFiscalDocumentStatus.FAILED
+            ? 'HIGH'
+            : 'MEDIUM',
+        message: `Fiscal invoice is ${status}; waiting for authorization before returning it to Shopee.`,
+        source: 'AUTO_INVOICE',
+        metadata: {
+          fiscalDocumentId: document.id,
+          status,
+          raw: fiscalData.raw,
+        },
+      });
+      await this.recordOrderLog({
+        shopId: payload.shopId,
+        orderSn,
+        action: 'AUTO_INVOICE',
+        status: 'BLOCKED',
+        request: payload,
+        response: {
+          fiscalDocumentId: document.id,
+          status,
+        },
+        errorMessage: `Fiscal invoice is ${status}`,
+      });
+      throw new ConflictException(
+        `Fiscal invoice is ${status}; wait until Focus NFe authorizes it before creating Shopee shipping documents.`,
+      );
+    }
+
     const shopeeInvoiceResult = await this.invoiceSdk.registerInvoice(payload.shopId, {
       orderSn,
       providerDocumentId: document.providerDocumentId,
