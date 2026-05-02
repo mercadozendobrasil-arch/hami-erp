@@ -6,6 +6,7 @@ import {
   ErpOrderStatusCountQueryDto,
 } from './dto/erp-order-query.dto';
 import {
+  ErpAutoInvoiceDto,
   ErpBatchMarkReadyForPickupDto,
   ErpBatchMarkShippedDto,
   ErpMarkReadyForPickupDto,
@@ -77,6 +78,14 @@ export class ErpOrdersController {
     @Body() payload: ErpOrderShopActionDto,
   ) {
     return this.erpOrdersService.syncOrderDetail(orderSn, payload);
+  }
+
+  @Post(':orderSn/auto-invoice')
+  autoInvoiceOrder(
+    @Param('orderSn') orderSn: string,
+    @Body() payload: ErpAutoInvoiceDto,
+  ) {
+    return this.erpOrdersService.autoInvoiceOrder(orderSn, payload);
   }
 
   @Get(':orderSn/escrow')

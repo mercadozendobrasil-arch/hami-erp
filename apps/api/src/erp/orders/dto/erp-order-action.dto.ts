@@ -38,6 +38,23 @@ export class ErpOrderShopActionDto {
   shopId!: string;
 }
 
+export class ErpAutoInvoiceDto extends ErpOrderShopActionDto {
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  payload?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  packageNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingDocumentType?: string;
+}
+
 export class ErpOrderExceptionTargetDto extends ErpOrderShopActionDto {
   @IsString()
   orderSn!: string;

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, ShopeeShop, ShopeeToken } from '@prisma/client';
 
-import { PrismaService } from 'src/infra/database/prisma.service';
+import { PrismaService } from '../infra/database/prisma.service';
 
 import { ShopeeTokenStorageInput } from './shopee.types';
 

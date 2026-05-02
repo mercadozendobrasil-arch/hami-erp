@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import {
   ErpFiscalDocumentStatus,
   ErpFiscalDocumentType,
+  ErpFiscalEventType,
+  ErpFiscalProvider,
   Prisma,
 } from '@prisma/client';
 
@@ -10,7 +12,10 @@ import { erpData } from '../common/erp-response';
 import { NuvemFiscalHttpService } from '../../fiscal/nuvem-fiscal/nuvem-fiscal-http.service';
 import { PrismaService } from '../../infra/database/prisma.service';
 
-import { ErpFiscalDocumentQueryDto } from './dto/erp-fiscal.dto';
+import {
+  ErpFiscalDocumentQueryDto,
+  ErpFiscalIssueOrderInvoiceDto,
+} from './dto/erp-fiscal.dto';
 
 type FiscalDocumentRow = {
   id: string;
@@ -46,7 +51,7 @@ export class ErpFiscalService {
     const clientId = this.configService.get<string>('NUVEM_FISCAL_CLIENT_ID');
     const clientSecret = this.configService.get<string>('NUVEM_FISCAL_CLIENT_SECRET');
     const scopes = this.configService
-      .get<string>('NUVEM_FISCAL_SCOPES', 'empresa cep cnpj')
+      .get<string>('NUVEM_FISCAL_SCOPES', 'empresa cep cnpj nfe')
       .split(/\s+/)
       .filter(Boolean);
 
@@ -124,6 +129,78 @@ export class ErpFiscalService {
       current,
       pageSize,
     };
+  }
+
+  async issueOrderInvoice(payload: ErpFiscalIssueOrderInvoiceDto) {
+    const type = payload.type ?? 'NFE';
+    const raw = await this.nuvemFiscalHttpService.post<Record<string, unknown>>(
+      `/${type.toLowerCase()}`,
+      payload.payload,
+    );
+    const status = this.mapDocumentStatus(raw);
+    const providerDocumentId = this.optionalString(
+      raw.id ?? raw.uuid ?? raw.document_id ?? raw.documentId,
+    );
+    const accessKey = this.optionalString(
+      raw.chave ?? raw.chave_acesso ?? raw.access_key ?? raw.accessKey,
+    );
+    const issueDate = this.optionalDate(
+      raw.data_emissao ?? raw.issue_date ?? raw.created_at,
+    );
+
+    const document = await this.prismaService.erpFiscalDocument.create({
+      data: {
+        provider: ErpFiscalProvider.NUVEM_FISCAL,
+        type: type as ErpFiscalDocumentType,
+        status,
+        shopId: payload.shopId,
+        orderSn: payload.orderSn,
+        providerDocumentId,
+        accessKey,
+        number: this.optionalString(raw.numero ?? raw.number),
+        series: this.optionalString(raw.serie ?? raw.series),
+        issueDate,
+        totalAmount: this.optionalDecimal(
+          raw.valor_total ?? raw.total_amount ?? raw.valorTotal,
+        ),
+        currency: this.optionalString(raw.moeda ?? raw.currency) ?? 'BRL',
+        xmlAvailable: payload.xmlAvailable ?? status === ErpFiscalDocumentStatus.AUTHORIZED,
+        pdfAvailable: payload.pdfAvailable ?? status === ErpFiscalDocumentStatus.AUTHORIZED,
+        lastSyncedAt: new Date(),
+        raw: this.toJson(raw),
+        errorMessage:
+          status === ErpFiscalDocumentStatus.REJECTED ||
+          status === ErpFiscalDocumentStatus.FAILED
+            ? this.optionalString(raw.mensagem ?? raw.message ?? raw.error)
+            : undefined,
+      },
+    });
+
+    await this.prismaService.erpFiscalEvent.create({
+      data: {
+        fiscalDocumentId: document.id,
+        eventType: ErpFiscalEventType.ISSUE,
+        status,
+        request: this.toJson(payload.payload),
+        response: this.toJson(raw),
+        errorMessage: document.errorMessage,
+      },
+    });
+
+    await this.prismaService.erpOrderProjection.updateMany({
+      where: {
+        shopId: payload.shopId,
+        orderSn: payload.orderSn,
+      },
+      data: {
+        invoiceStatus: status,
+      },
+    });
+
+    return erpData({
+      document: this.toDocumentItem(document),
+      raw,
+    });
   }
 
   async getDocument(id: string) {
@@ -234,5 +311,42 @@ export class ErpFiscalService {
   private optionalString(input: unknown): string | undefined {
     if (input === undefined || input === null || input === '') return undefined;
     return String(input);
+  }
+
+  private optionalDecimal(input: unknown): Prisma.Decimal | undefined {
+    if (input === undefined || input === null || input === '') return undefined;
+    return new Prisma.Decimal(String(input));
+  }
+
+  private optionalDate(input: unknown): Date | undefined {
+    if (input === undefined || input === null || input === '') return undefined;
+    const date = new Date(String(input));
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  private mapDocumentStatus(raw: Record<string, unknown>): ErpFiscalDocumentStatus {
+    const value = String(raw.status ?? raw.situacao ?? raw.state ?? '').toLowerCase();
+    if (['authorized', 'autorizada', 'autorizado', 'success'].includes(value)) {
+      return ErpFiscalDocumentStatus.AUTHORIZED;
+    }
+    if (['processing', 'processando', 'pending'].includes(value)) {
+      return ErpFiscalDocumentStatus.PROCESSING;
+    }
+    if (['rejected', 'rejeitada', 'rejeitado'].includes(value)) {
+      return ErpFiscalDocumentStatus.REJECTED;
+    }
+    if (['cancelled', 'canceled', 'cancelada', 'cancelado'].includes(value)) {
+      return ErpFiscalDocumentStatus.CANCELLED;
+    }
+    if (['failed', 'erro', 'error'].includes(value)) {
+      return ErpFiscalDocumentStatus.FAILED;
+    }
+    return raw.chave || raw.chave_acesso || raw.access_key
+      ? ErpFiscalDocumentStatus.AUTHORIZED
+      : ErpFiscalDocumentStatus.UNKNOWN;
+  }
+
+  private toJson(input: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
   }
 }

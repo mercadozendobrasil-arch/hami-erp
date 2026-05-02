@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ErpLabelStatus, JobStatus, Prisma } from '@prisma/client';
 
-import { PrismaService } from 'src/infra/database/prisma.service';
-import { OrderSdk } from 'src/shopee-sdk/modules/order.sdk';
+import { PrismaService } from '../../infra/database/prisma.service';
+import { ErpFiscalService } from '../fiscal/erp-fiscal.service';
+import { InvoiceSdk } from '../../shopee-sdk/modules/invoice.sdk';
+import { OrderSdk } from '../../shopee-sdk/modules/order.sdk';
 
 import {
   ErpFulfillmentStage,
@@ -11,6 +13,7 @@ import {
   ErpOrderStatusCountQueryDto,
 } from './dto/erp-order-query.dto';
 import {
+  ErpAutoInvoiceDto,
   ErpBatchMarkReadyForPickupDto,
   ErpBatchMarkShippedDto,
   ErpMarkReadyForPickupDto,
@@ -81,6 +84,8 @@ export class ErpOrdersService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly orderSdk: OrderSdk,
+    private readonly erpFiscalService: ErpFiscalService,
+    private readonly invoiceSdk: InvoiceSdk,
   ) {}
 
   async getStatusCounts(query: ErpOrderStatusCountQueryDto) {
@@ -412,6 +417,120 @@ export class ErpOrdersService {
       );
       throw error;
     }
+  }
+
+  async autoInvoiceOrder(orderSn: string, payload: ErpAutoInvoiceDto) {
+    const projection = await this.prismaService.erpOrderProjection.findUnique({
+      where: {
+        shopId_orderSn: {
+          shopId: payload.shopId,
+          orderSn,
+        },
+      },
+    });
+
+    if (!projection) {
+      throw new NotFoundException('ERP order projection not found for auto invoice.');
+    }
+
+    const invoicePayload = payload.payload ?? this.buildDefaultInvoicePayload(projection);
+    const fiscalResult = await this.erpFiscalService.issueOrderInvoice({
+      shopId: payload.shopId,
+      orderSn,
+      type: payload.type === 'NFCE' ? 'NFCE' : 'NFE',
+      payload: invoicePayload,
+    });
+    const fiscalData = fiscalResult.data as {
+      document: {
+        id: string;
+        providerDocumentId?: string | null;
+        accessKey?: string | null;
+        number?: string | null;
+        series?: string | null;
+        xmlAvailable?: boolean;
+        pdfAvailable?: boolean;
+      };
+      raw?: unknown;
+    };
+    const document = fiscalData.document;
+    const shopeeInvoiceResult = await this.invoiceSdk.registerInvoice(payload.shopId, {
+      orderSn,
+      providerDocumentId: document.providerDocumentId,
+      accessKey: document.accessKey,
+      number: document.number,
+      series: document.series,
+      xmlAvailable: document.xmlAvailable,
+      pdfAvailable: document.pdfAvailable,
+      raw: fiscalData.raw,
+    });
+
+    const printTask = await this.createPrintTask({
+      shopId: payload.shopId,
+      orders: [
+        {
+          orderSn,
+          packageNumber: payload.packageNumber ?? projection.packageNumber ?? undefined,
+          shippingDocumentType:
+            payload.shippingDocumentType ??
+            projection.shippingDocumentType ??
+            'NORMAL_AIR_WAYBILL',
+        },
+      ],
+    });
+
+    await this.prismaService.erpOrderProjection.update({
+      where: {
+        shopId_orderSn: {
+          shopId: payload.shopId,
+          orderSn,
+        },
+      },
+      data: {
+        invoiceStatus: 'AUTHORIZED',
+        fulfillmentStage: 'pending_print',
+      },
+    });
+
+    await this.recordStageHistory({
+      shopId: payload.shopId,
+      orderSn,
+      fromStage: projection.fulfillmentStage,
+      toStage: 'pending_print',
+      trigger: 'AUTO_INVOICE',
+      action: 'AUTO_INVOICE_AND_CREATE_SHIPPING_DOCUMENT',
+      jobRecordId: printTask.data.jobId,
+      metadata: {
+        fiscalDocumentId: document.id,
+        shopeeInvoiceResult,
+      },
+    });
+
+    await this.recordOrderLog({
+      shopId: payload.shopId,
+      orderSn,
+      action: 'AUTO_INVOICE',
+      status: 'SUCCESS',
+      jobRecordId: printTask.data.jobId,
+      request: payload,
+      response: {
+        fiscalDocumentId: document.id,
+        shopeeInvoiceResult,
+        shippingDocumentJobId: printTask.data.jobId,
+        labelIds: printTask.data.labelIds,
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        fiscalDocumentId: document.id,
+        shopeeInvoiceResult,
+        shippingDocumentJobId: printTask.data.jobId,
+        labelIds: printTask.data.labelIds,
+        nextStage: 'pending_print',
+        nextAction: 'mark-ready-for-pickup',
+      },
+    };
   }
 
   async downloadLabel(labelId: string) {
@@ -1310,6 +1429,23 @@ export class ErpOrdersService {
     return input && typeof input === 'object' && !Array.isArray(input)
       ? (input as Record<string, unknown>)
       : {};
+  }
+
+  private buildDefaultInvoicePayload(
+    projection: OrderProjectionDetailRow | OrderProjectionListRow,
+  ) {
+    const raw = this.asRecord((projection as OrderProjectionDetailRow).raw);
+    return {
+      pedido: projection.orderSn,
+      valor_total: projection.totalAmount?.toString() ?? '0.00',
+      moeda: projection.currency ?? 'BRL',
+      itens: Array.isArray(raw.item_list) ? raw.item_list : [],
+      destinatario: raw.recipient_address,
+      origem: {
+        platform: 'SHOPEE',
+        shopId: projection.shopId,
+      },
+    };
   }
 
   private errorMessage(error: unknown, fallback: string) {

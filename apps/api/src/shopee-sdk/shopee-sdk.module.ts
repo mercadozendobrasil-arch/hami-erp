@@ -8,6 +8,7 @@ import { ShopeeErrorMapper } from './shopee-error.mapper';
 import { ShopeeHttpService } from './shopee-http.service';
 import { ShopeeSignature } from './shopee-signature';
 import { AuthSdk } from './modules/auth.sdk';
+import { InvoiceSdk } from './modules/invoice.sdk';
 import { LogisticsSdk } from './modules/logistics.sdk';
 import { MediaSdk } from './modules/media.sdk';
 import { OrderSdk } from './modules/order.sdk';
@@ -81,6 +82,7 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
     ShopeeHttpService,
     ShopeeClient,
     AuthSdk,
+    InvoiceSdk,
     ShopSdk,
     ProductSdk,
     MediaSdk,
@@ -97,6 +99,7 @@ const noopShopeeApiLogger: ShopeeApiLogger = {
     ShopeeHttpService,
     ShopeeClient,
     AuthSdk,
+    InvoiceSdk,
     ShopSdk,
     ProductSdk,
     MediaSdk,

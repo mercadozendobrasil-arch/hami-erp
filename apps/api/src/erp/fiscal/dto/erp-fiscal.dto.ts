@@ -1,7 +1,9 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -60,4 +62,27 @@ export class ErpFiscalDocumentQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+}
+
+export class ErpFiscalIssueOrderInvoiceDto {
+  @IsString()
+  shopId!: string;
+
+  @IsString()
+  orderSn!: string;
+
+  @IsOptional()
+  @IsIn(FISCAL_DOCUMENT_TYPES)
+  type?: (typeof FISCAL_DOCUMENT_TYPES)[number];
+
+  @IsObject()
+  payload!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsBoolean()
+  xmlAvailable?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  pdfAvailable?: boolean;
 }

@@ -3,8 +3,8 @@ import { Injectable } from '@nestjs/common';
 import {
   ShopeeApiEnvelope,
   ShopeeOrderListParams,
-} from 'src/common/shopee.types';
-import { ShopeeTokenService } from 'src/common/shopee-token.service';
+} from '../../common/shopee.types';
+import { ShopeeTokenService } from '../../common/shopee-token.service';
 
 import { ShopeeClient } from '../shopee-client';
 import { toShopeePayload } from '../shopee-payload';
