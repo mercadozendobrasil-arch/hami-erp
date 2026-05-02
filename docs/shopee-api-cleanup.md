@@ -6,7 +6,8 @@ This document is the canonical cleanup plan for removing duplicate Shopee ERP ba
 
 `apps/api` is the only backend that should be built, deployed, and extended.
 
-`apps/web/server/erp-api` is deprecated. It may be used only as a temporary reference while remaining behavior is checked or migrated.
+The old nested frontend service has been removed. Do not recreate backend code
+under `apps/web`.
 
 ## Keep
 
@@ -27,9 +28,9 @@ This document is the canonical cleanup plan for removing duplicate Shopee ERP ba
 - `docs/deployment.md`
 - `deploy/nginx/hamimih.com.conf`
 
-## Remove or archive
+## Removed or Archived
 
-- `apps/web/server/erp-api`
+- old nested frontend backend service
 - committed runtime `.env` files
 - committed local PostgreSQL data directories
 - obsolete Phase 1 runbooks that reference `/api/shops`, `/api/products`, `/api/orders`, or `/api/shopee/auth/url`
@@ -62,9 +63,9 @@ Do not use these legacy paths for new code:
 /api/orders
 ```
 
-## Required migration checks before full directory deletion
+## Required Migration Coverage
 
-Verify `apps/api` covers the following before deleting the old service directory entirely:
+Keep `apps/api` responsible for these flows:
 
 - OAuth authorization URL generation
 - OAuth callback token exchange

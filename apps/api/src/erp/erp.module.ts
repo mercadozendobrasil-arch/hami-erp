@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { ErpDashboardController } from './dashboard/erp-dashboard.controller';
+import { ErpDashboardService } from './dashboard/erp-dashboard.service';
 import { ErpFinanceController } from './finance/erp-finance.controller';
 import { ErpFinanceService } from './finance/erp-finance.service';
 import { ErpInventoryController } from './inventory/erp-inventory.controller';
@@ -14,11 +16,14 @@ import { ErpProductsController } from './products/erp-products.controller';
 import { ErpProductsService } from './products/erp-products.service';
 import { ErpPurchasesController } from './purchases/erp-purchases.controller';
 import { ErpPurchasesService } from './purchases/erp-purchases.service';
+import { ErpSyncLogsController } from './sync-logs/erp-sync-logs.controller';
+import { ErpSyncLogsService } from './sync-logs/erp-sync-logs.service';
 import { ErpSystemController } from './system/erp-system.controller';
 import { ErpSystemService } from './system/erp-system.service';
 
 @Module({
   controllers: [
+    ErpDashboardController,
     ErpJobsController,
     ErpOrderActionsController,
     ErpOrdersController,
@@ -26,9 +31,11 @@ import { ErpSystemService } from './system/erp-system.service';
     ErpInventoryController,
     ErpPurchasesController,
     ErpFinanceController,
+    ErpSyncLogsController,
     ErpSystemController,
   ],
   providers: [
+    ErpDashboardService,
     ErpJobsService,
     ErpOrderActionsService,
     ErpOrdersService,
@@ -36,6 +43,7 @@ import { ErpSystemService } from './system/erp-system.service';
     ErpInventoryService,
     ErpPurchasesService,
     ErpFinanceService,
+    ErpSyncLogsService,
     ErpSystemService,
   ],
 })
