@@ -86,6 +86,7 @@ enum ErpPurchaseItemStatus {
 
 enum ErpFiscalProvider {
   NUVEM_FISCAL
+  FOCUS_NFE
 }
 
 enum ErpFiscalDocumentType {

@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 
+import { FocusNfeModule } from '../fiscal/focus-nfe/focus-nfe.module';
+import { NuvemFiscalModule } from '../fiscal/nuvem-fiscal/nuvem-fiscal.module';
+
 import { ErpDashboardController } from './dashboard/erp-dashboard.controller';
 import { ErpDashboardService } from './dashboard/erp-dashboard.service';
 import { ErpFinanceController } from './finance/erp-finance.controller';
@@ -24,6 +27,7 @@ import { ErpSystemController } from './system/erp-system.controller';
 import { ErpSystemService } from './system/erp-system.service';
 
 @Module({
+  imports: [FocusNfeModule, NuvemFiscalModule],
   controllers: [
     ErpDashboardController,
     ErpJobsController,

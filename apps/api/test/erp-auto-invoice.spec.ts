@@ -3,19 +3,23 @@ import { Prisma } from '@prisma/client';
 
 import { ErpFiscalService } from '../src/erp/fiscal/erp-fiscal.service';
 import { ErpOrdersService } from '../src/erp/orders/erp-orders.service';
+import { FocusNfeHttpService } from '../src/fiscal/focus-nfe/focus-nfe-http.service';
 import { NuvemFiscalHttpService } from '../src/fiscal/nuvem-fiscal/nuvem-fiscal-http.service';
 import { InvoiceSdk } from '../src/shopee-sdk/modules/invoice.sdk';
 
 describe('ErpFiscalService automatic invoice issuance', () => {
   const configService = new ConfigService({
-    NUVEM_FISCAL_ENV: 'sandbox',
-    NUVEM_FISCAL_CLIENT_ID: 'client-id',
-    NUVEM_FISCAL_CLIENT_SECRET: 'client-secret',
+    FOCUS_NFE_ENV: 'homologation',
+    FOCUS_NFE_TOKEN: 'focus-token',
   });
 
-  const fiscalHttp = {
-    getEnvironment: jest.fn(() => 'sandbox'),
+  const focusNfeHttp = {
+    getEnvironment: jest.fn(() => 'homologation'),
     post: jest.fn(),
+  } as unknown as jest.Mocked<FocusNfeHttpService>;
+  const nuvemFiscalHttp = {
+    get: jest.fn(),
+    download: jest.fn(),
   } as unknown as jest.Mocked<NuvemFiscalHttpService>;
 
   const prismaService = {
@@ -34,24 +38,25 @@ describe('ErpFiscalService automatic invoice issuance', () => {
     jest.clearAllMocks();
   });
 
-  it('issues an order invoice through Nuvem Fiscal and records the local document', async () => {
-    fiscalHttp.post.mockResolvedValue({
-      id: 'nf-123',
-      status: 'autorizada',
-      chave: '35260500000000000100550010000000101234567890',
+  it('issues an order invoice through Focus NFe and records the local document', async () => {
+    focusNfeHttp.post.mockResolvedValue({
+      ref: 'ORDER-1',
+      status: 'autorizado',
+      chave_nfe: '35260500000000000100550010000000101234567890',
       numero: '10',
       serie: '1',
-      data_emissao: '2026-05-02T12:00:00.000Z',
+      caminho_xml_nota_fiscal: '/arquivos/nfe.xml',
+      caminho_danfe: '/arquivos/danfe.pdf',
       valor_total: '199.90',
     });
     prismaService.erpFiscalDocument.create.mockResolvedValue({
       id: 'doc-1',
-      provider: 'NUVEM_FISCAL',
+      provider: 'FOCUS_NFE',
       type: 'NFE',
       status: 'AUTHORIZED',
       shopId: '123',
       orderSn: 'ORDER-1',
-      providerDocumentId: 'nf-123',
+      providerDocumentId: 'ORDER-1',
       accessKey: '35260500000000000100550010000000101234567890',
       number: '10',
       series: '1',
@@ -69,7 +74,8 @@ describe('ErpFiscalService automatic invoice issuance', () => {
     prismaService.erpOrderProjection.updateMany.mockResolvedValue({ count: 1 });
     const service = new ErpFiscalService(
       configService,
-      fiscalHttp,
+      focusNfeHttp,
+      nuvemFiscalHttp,
       prismaService as never,
     );
 
@@ -89,25 +95,29 @@ describe('ErpFiscalService automatic invoice issuance', () => {
         document: {
           id: 'doc-1',
           status: 'AUTHORIZED',
-          providerDocumentId: 'nf-123',
+          providerDocumentId: 'ORDER-1',
           accessKey: '35260500000000000100550010000000101234567890',
         },
-        raw: expect.objectContaining({ id: 'nf-123' }),
+        raw: expect.objectContaining({ ref: 'ORDER-1' }),
       },
     });
 
-    expect(fiscalHttp.post).toHaveBeenCalledWith('/nfe', {
-      pedido: 'ORDER-1',
-      valor_total: '199.90',
-    });
+    expect(focusNfeHttp.post).toHaveBeenCalledWith(
+      '/v2/nfe',
+      {
+        pedido: 'ORDER-1',
+        valor_total: '199.90',
+      },
+      { ref: 'ORDER-1' },
+    );
     expect(prismaService.erpFiscalDocument.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        provider: 'NUVEM_FISCAL',
+        provider: 'FOCUS_NFE',
         type: 'NFE',
         status: 'AUTHORIZED',
         shopId: '123',
         orderSn: 'ORDER-1',
-        providerDocumentId: 'nf-123',
+        providerDocumentId: 'ORDER-1',
         accessKey: '35260500000000000100550010000000101234567890',
       }),
     });

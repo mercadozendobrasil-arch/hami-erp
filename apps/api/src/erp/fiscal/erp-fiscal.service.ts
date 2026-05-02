@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 
 import { erpData } from '../common/erp-response';
+import { FocusNfeHttpService } from '../../fiscal/focus-nfe/focus-nfe-http.service';
 import { NuvemFiscalHttpService } from '../../fiscal/nuvem-fiscal/nuvem-fiscal-http.service';
 import { PrismaService } from '../../infra/database/prisma.service';
 
@@ -43,23 +44,16 @@ type FiscalDocumentRow = {
 export class ErpFiscalService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly focusNfeHttpService: FocusNfeHttpService,
     private readonly nuvemFiscalHttpService: NuvemFiscalHttpService,
     private readonly prismaService: PrismaService,
   ) {}
 
   getHealth() {
-    const clientId = this.configService.get<string>('NUVEM_FISCAL_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('NUVEM_FISCAL_CLIENT_SECRET');
-    const scopes = this.configService
-      .get<string>('NUVEM_FISCAL_SCOPES', 'empresa cep cnpj nfe')
-      .split(/\s+/)
-      .filter(Boolean);
-
     return erpData({
-      provider: 'NUVEM_FISCAL',
-      environment: this.nuvemFiscalHttpService.getEnvironment(),
-      scopes,
-      credentialsConfigured: Boolean(clientId && clientSecret),
+      provider: 'FOCUS_NFE',
+      environment: this.focusNfeHttpService.getEnvironment(),
+      credentialsConfigured: Boolean(this.configService.get<string>('FOCUS_NFE_TOKEN')),
     });
   }
 
@@ -133,16 +127,17 @@ export class ErpFiscalService {
 
   async issueOrderInvoice(payload: ErpFiscalIssueOrderInvoiceDto) {
     const type = payload.type ?? 'NFE';
-    const raw = await this.nuvemFiscalHttpService.post<Record<string, unknown>>(
-      `/${type.toLowerCase()}`,
+    const raw = await this.focusNfeHttpService.post<Record<string, unknown>>(
+      `/v2/${type.toLowerCase()}`,
       payload.payload,
+      { ref: payload.orderSn },
     );
     const status = this.mapDocumentStatus(raw);
     const providerDocumentId = this.optionalString(
-      raw.id ?? raw.uuid ?? raw.document_id ?? raw.documentId,
+      raw.ref ?? raw.id ?? raw.uuid ?? raw.document_id ?? raw.documentId,
     );
     const accessKey = this.optionalString(
-      raw.chave ?? raw.chave_acesso ?? raw.access_key ?? raw.accessKey,
+      raw.chave_nfe ?? raw.chave ?? raw.chave_acesso ?? raw.access_key ?? raw.accessKey,
     );
     const issueDate = this.optionalDate(
       raw.data_emissao ?? raw.issue_date ?? raw.created_at,
@@ -150,7 +145,7 @@ export class ErpFiscalService {
 
     const document = await this.prismaService.erpFiscalDocument.create({
       data: {
-        provider: ErpFiscalProvider.NUVEM_FISCAL,
+        provider: ErpFiscalProvider.FOCUS_NFE,
         type: type as ErpFiscalDocumentType,
         status,
         shopId: payload.shopId,
@@ -241,9 +236,10 @@ export class ErpFiscalService {
       throw new ConflictException(`Fiscal ${artifact.toUpperCase()} is not ready.`);
     }
 
-    const file = await this.nuvemFiscalHttpService.download(
-      `/${document.type.toLowerCase()}/${document.providerDocumentId}/${artifact}`,
-    );
+    const downloadPath = this.resolveDownloadPath(document, artifact);
+    const file = document.provider === 'FOCUS_NFE'
+      ? await this.focusNfeHttpService.download(downloadPath)
+      : await this.nuvemFiscalHttpService.download(downloadPath);
 
     return {
       file,
@@ -326,13 +322,13 @@ export class ErpFiscalService {
 
   private mapDocumentStatus(raw: Record<string, unknown>): ErpFiscalDocumentStatus {
     const value = String(raw.status ?? raw.situacao ?? raw.state ?? '').toLowerCase();
-    if (['authorized', 'autorizada', 'autorizado', 'success'].includes(value)) {
+    if (['authorized', 'autorizada', 'autorizado', 'autorizado_uso', 'success'].includes(value)) {
       return ErpFiscalDocumentStatus.AUTHORIZED;
     }
-    if (['processing', 'processando', 'pending'].includes(value)) {
+    if (['processing', 'processando', 'processando_autorizacao', 'pending'].includes(value)) {
       return ErpFiscalDocumentStatus.PROCESSING;
     }
-    if (['rejected', 'rejeitada', 'rejeitado'].includes(value)) {
+    if (['rejected', 'rejeitada', 'rejeitado', 'erro_autorizacao'].includes(value)) {
       return ErpFiscalDocumentStatus.REJECTED;
     }
     if (['cancelled', 'canceled', 'cancelada', 'cancelado'].includes(value)) {
@@ -341,12 +337,30 @@ export class ErpFiscalService {
     if (['failed', 'erro', 'error'].includes(value)) {
       return ErpFiscalDocumentStatus.FAILED;
     }
-    return raw.chave || raw.chave_acesso || raw.access_key
+    return raw.chave_nfe || raw.chave || raw.chave_acesso || raw.access_key
       ? ErpFiscalDocumentStatus.AUTHORIZED
       : ErpFiscalDocumentStatus.UNKNOWN;
   }
 
   private toJson(input: unknown): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
+  }
+
+  private resolveDownloadPath(
+    document: { provider: string; type: string; providerDocumentId: string | null; raw?: Prisma.JsonValue | null },
+    artifact: 'xml' | 'pdf',
+  ) {
+    if (document.provider === 'FOCUS_NFE') {
+      const raw = document.raw && typeof document.raw === 'object' && !Array.isArray(document.raw)
+        ? (document.raw as Record<string, unknown>)
+        : {};
+      const path = artifact === 'xml'
+        ? raw.caminho_xml_nota_fiscal
+        : raw.caminho_danfe ?? raw.caminho_pdf;
+      if (typeof path === 'string' && path) return path;
+      return `/v2/${document.type.toLowerCase()}/${document.providerDocumentId}`;
+    }
+
+    return `/${document.type.toLowerCase()}/${document.providerDocumentId}/${artifact}`;
   }
 }

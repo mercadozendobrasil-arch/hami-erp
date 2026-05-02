@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 
 import { ErpFiscalService } from '../src/erp/fiscal/erp-fiscal.service';
+import { FocusNfeHttpService } from '../src/fiscal/focus-nfe/focus-nfe-http.service';
 import { NuvemFiscalHttpService } from '../src/fiscal/nuvem-fiscal/nuvem-fiscal-http.service';
 
 const schemaPath = join(__dirname, '..', 'prisma', 'schema.prisma');
@@ -25,14 +26,16 @@ describe('ERP fiscal schema', () => {
 
 describe('ErpFiscalService', () => {
   const configService = new ConfigService({
-    NUVEM_FISCAL_ENV: 'sandbox',
-    NUVEM_FISCAL_SCOPES: 'empresa cep cnpj',
-    NUVEM_FISCAL_CLIENT_ID: 'client-id',
-    NUVEM_FISCAL_CLIENT_SECRET: 'client-secret',
+    FOCUS_NFE_ENV: 'homologation',
+    FOCUS_NFE_TOKEN: 'focus-token',
   });
 
+  const focusNfeHttp = {
+    getEnvironment: jest.fn(() => 'homologation'),
+    download: jest.fn(),
+  } as unknown as jest.Mocked<FocusNfeHttpService>;
+
   const fiscalHttp = {
-    getEnvironment: jest.fn(() => 'sandbox'),
     get: jest.fn(),
     download: jest.fn(),
   } as unknown as jest.Mocked<NuvemFiscalHttpService>;
@@ -56,6 +59,7 @@ describe('ErpFiscalService', () => {
   it('reports configured health without exposing credentials', () => {
     const service = new ErpFiscalService(
       configService,
+      focusNfeHttp,
       fiscalHttp,
       prismaService as never,
     );
@@ -63,9 +67,8 @@ describe('ErpFiscalService', () => {
     expect(service.getHealth()).toEqual({
       success: true,
       data: {
-        provider: 'NUVEM_FISCAL',
-        environment: 'sandbox',
-        scopes: ['empresa', 'cep', 'cnpj'],
+        provider: 'FOCUS_NFE',
+        environment: 'homologation',
         credentialsConfigured: true,
       },
     });
@@ -81,6 +84,7 @@ describe('ErpFiscalService', () => {
     });
     const service = new ErpFiscalService(
       configService,
+      focusNfeHttp,
       fiscalHttp,
       prismaService as never,
     );
@@ -116,6 +120,7 @@ describe('ErpFiscalService', () => {
     });
     const service = new ErpFiscalService(
       configService,
+      focusNfeHttp,
       fiscalHttp,
       prismaService as never,
     );
@@ -169,6 +174,7 @@ describe('ErpFiscalService', () => {
     ]);
     const service = new ErpFiscalService(
       configService,
+      focusNfeHttp,
       fiscalHttp,
       prismaService as never,
     );

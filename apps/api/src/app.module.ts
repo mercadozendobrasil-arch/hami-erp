@@ -16,6 +16,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { FocusNfeModule } from './fiscal/focus-nfe/focus-nfe.module';
 import { NuvemFiscalModule } from './fiscal/nuvem-fiscal/nuvem-fiscal.module';
 import { ShopeeSdkModule } from './shopee-sdk/shopee-sdk.module';
 
@@ -40,6 +41,7 @@ import { ShopeeSdkModule } from './shopee-sdk/shopee-sdk.module';
     CommonModule,
     PrismaModule,
     ShopeeSdkModule,
+    FocusNfeModule,
     NuvemFiscalModule,
     QueueModule,
     AuthModule,
