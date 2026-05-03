@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { NuvemFiscalError, type NuvemFiscalTokenResponse } from './nuvem-fiscal.types';
@@ -9,7 +9,7 @@ export class NuvemFiscalAuthService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly fetchImpl: typeof fetch = fetch,
+    @Optional() private readonly injectedFetchImpl?: typeof fetch,
   ) {}
 
   async getAccessToken(): Promise<string> {
@@ -43,7 +43,7 @@ export class NuvemFiscalAuthService {
       accept: 'application/json',
     });
 
-    const response = await this.fetchImpl(authUrl, {
+    const response = await (this.injectedFetchImpl ?? fetch)(authUrl, {
       method: 'POST',
       headers,
       body,
