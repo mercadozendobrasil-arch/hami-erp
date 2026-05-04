@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Header, Param, Post, Query, StreamableFile } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 
 import {
   ErpOrderLogQueryDto,
@@ -31,6 +41,13 @@ export class ErpOrdersController {
 
   @Post('labels/print-task')
   createPrintTask(@Body() payload: ErpPrintLabelTaskDto) {
+    const missingPackage = payload.orders?.find((order) => !order.packageNumber);
+    if (missingPackage) {
+      throw new BadRequestException(
+        `Order ${missingPackage.orderSn} is missing packageNumber. Arrange shipment or sync package detail before printing.`,
+      );
+    }
+
     return this.erpOrdersService.createPrintTask(payload);
   }
 

@@ -8,6 +8,14 @@ import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import { queryOrders } from '@/services/erp/order';
 import { createLivePrintLabelTask } from '@/services/erp/orderLive';
 
+const getPackageNumber = (row: ERP.OrderListItem) =>
+  row.packageNumber || row.packageList?.[0]?.packageNumber;
+
+const getShippingDocumentType = (row: ERP.OrderListItem) =>
+  row.packageList?.[0]?.shippingDocumentType;
+
+const canPrintOrder = (row: ERP.OrderListItem) => Boolean(getPackageNumber(row));
+
 const BatchPrintPage: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
   const [selectedRows, setSelectedRows] = useState<ERP.OrderListItem[]>([]);
@@ -25,10 +33,16 @@ const BatchPrintPage: React.FC = () => {
       return;
     }
 
-    if (
-      selectedRows.some((row) => row.platformShopId && row.platformShopId !== shopId)
-    ) {
+    if (selectedRows.some((row) => row.platformShopId && row.platformShopId !== shopId)) {
       messageApi.error('批量打印只支持同一店铺订单');
+      return;
+    }
+
+    const blockedRows = selectedRows.filter((row) => !canPrintOrder(row));
+    if (blockedRows.length) {
+      messageApi.error(
+        `订单 ${blockedRows.map((row) => row.orderSn).join(', ')} 缺少 Shopee 包裹号，请先安排发货或同步包裹详情`,
+      );
       return;
     }
 
@@ -38,8 +52,8 @@ const BatchPrintPage: React.FC = () => {
         shopId,
         orders: selectedRows.map((row) => ({
           orderSn: row.orderSn,
-          packageNumber: row.packageNumber,
-          shippingDocumentType: row.packageList?.[0]?.shippingDocumentType,
+          packageNumber: getPackageNumber(row),
+          shippingDocumentType: getShippingDocumentType(row),
         })),
       });
       hide();
@@ -76,7 +90,7 @@ const BatchPrintPage: React.FC = () => {
       dataIndex: 'orderTime',
       width: 180,
       search: false,
-      renderText: (value) => dayjs(value).format('YYYY-MM-DD HH:mm:ss'),
+      renderText: (value) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
     },
   ];
 
@@ -110,6 +124,12 @@ const BatchPrintPage: React.FC = () => {
         rowSelection={{
           selectedRowKeys: selectedRows.map((row) => row.id),
           onChange: (_, rows) => setSelectedRows(rows),
+          getCheckboxProps: (record) => ({
+            disabled: !canPrintOrder(record),
+            title: !canPrintOrder(record)
+              ? '缺少 Shopee 包裹号，请先安排发货或同步包裹详情'
+              : undefined,
+          }),
         }}
         pagination={{ pageSize: 10 }}
         toolBarRender={() => [
