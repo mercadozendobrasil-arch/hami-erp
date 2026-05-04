@@ -363,13 +363,7 @@ export async function getOrderEscrow(orderSn: string, shopId: string) {
 }
 
 export async function queryAfterSales(params: ERP.OrderQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<ERP.AfterSaleItem>>(
-    '/api/after-sales',
-    'GET',
-    () => mockQueryAfterSales(params),
-    params,
-    true,
-  );
+  const response = mockQueryAfterSales(params);
   return normalizeListResponse({
     ...response,
     data: (response.data || []).map((item) => ({
@@ -512,25 +506,12 @@ export async function queryShopeeSyncLogs(params: ERP.ShopeeSyncLogQueryParams) 
 }
 
 export async function queryOrderRules(params: ERP.RuleQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<ERP.RuleConfigItem>>(
-    '/api/rules',
-    'GET',
-    () => mockQueryRules(params),
-    params,
-    true,
-  );
+  const response = mockQueryRules(params);
   return normalizeListResponse(response);
 }
 
 export async function getOrderRuleDetail(id: string) {
-  const response = await requestWithFallback<ERP.ApiResponse<ERP.RuleConfigItem>>(
-    `/api/rules/${id}`,
-    'GET',
-    () => ({ success: true, data: mockGetRuleDetail(id) }),
-    undefined,
-    true,
-  );
-  return response.data;
+  return mockGetRuleDetail(id);
 }
 
 export async function getOrderOverview(currentTab?: string) {
@@ -1027,34 +1008,13 @@ export function getShippingDocumentDownloadUrl(
 }
 
 export async function saveOrderRule(payload: ERP.RuleSavePayload) {
-  const response = await requestWithFallback<ERP.ApiResponse<ERP.RuleConfigItem>>(
-    '/api/rules',
-    'POST',
-    () => saveRule(payload),
-    payload,
-    true,
-  );
-  return response.data;
+  return saveRule(payload);
 }
 
 export async function toggleOrderRule(id: string) {
-  const response = await requestWithFallback<ERP.ApiResponse<ERP.RuleConfigItem>>(
-    `/api/rules/${id}/toggle`,
-    'POST',
-    () => toggleRule(id),
-    { id },
-    true,
-  );
-  return response.data;
+  return toggleRule(id);
 }
 
 export async function deleteOrderRule(id: string) {
-  const response = await requestWithFallback<ERP.ApiResponse<{ id: string }>>(
-    `/api/rules/${id}/delete`,
-    'POST',
-    () => deleteRule(id),
-    { id },
-    true,
-  );
-  return response.data;
+  return deleteRule(id);
 }
