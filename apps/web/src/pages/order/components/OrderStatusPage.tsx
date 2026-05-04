@@ -1,8 +1,10 @@
 import { Alert } from 'antd';
 import { PageContainer } from '@ant-design/pro-components';
-import { useLocation } from '@umijs/max';
-import React, { useMemo } from 'react';
+import { history, useLocation } from '@umijs/max';
+import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useMemo } from 'react';
 import { queryOrders } from '@/services/erp/order';
+import { queryShops } from '@/services/erp/shop';
 import {
   queryLiveOrders,
   LiveFulfillmentStage,
@@ -47,6 +49,23 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
     [location.search],
   );
   const effectiveShopId = shopId || queryShopId;
+  const { data: shopsResponse } = useQuery({
+    queryKey: ['order-status-shops'],
+    queryFn: () => queryShops({ current: 1, pageSize: 100 }),
+    enabled: !effectiveShopId,
+  });
+  const firstShopId = shopsResponse?.data?.[0]?.shopId;
+
+  useEffect(() => {
+    if (effectiveShopId || !firstShopId) {
+      return;
+    }
+
+    const search = new URLSearchParams(location.search);
+    search.set('shopId', firstShopId);
+    history.replace(`${location.pathname}?${search.toString()}`);
+  }, [effectiveShopId, firstShopId, location.pathname, location.search]);
+
   const overviewItemsMap: Record<string, Array<{ key: keyof ERP.OrderOverview; title: string }>> = {
     pending: [
       { key: 'pendingCount', title: '待处理总量' },
