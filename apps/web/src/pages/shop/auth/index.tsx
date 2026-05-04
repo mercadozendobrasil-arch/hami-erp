@@ -21,6 +21,8 @@ import {
   submitShopeeAuthCallback,
 } from '@/services/erp/shop';
 
+const SHOPEE_TEST_REDIRECT_URI = 'https://staging.hamimih.com/shop/auth/';
+
 const ShopAuthPage: React.FC = () => {
   const location = useLocation();
   const [messageApi, contextHolder] = message.useMessage();
@@ -56,8 +58,7 @@ const ShopAuthPage: React.FC = () => {
 
   const handleAuthorize = async () => {
     try {
-      const redirectUri = `${window.location.origin}/shop/auth/`;
-      const response = await getShopeeAuthUrl(redirectUri);
+      const response = await getShopeeAuthUrl(SHOPEE_TEST_REDIRECT_URI);
       window.location.href = response.url;
     } catch (error) {
       console.error(error);

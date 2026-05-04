@@ -37,15 +37,15 @@ API_PREFIX=api
 SWAGGER_PATH=docs
 
 SHOPEE_ENV=sandbox
-SHOPEE_SANDBOX_BASE_URL=https://partner.test-stable.shopeemobile.com
+SHOPEE_SANDBOX_BASE_URL=https://openplatform.sandbox.test-stable.shopee.sg
 SHOPEE_SANDBOX_PARTNER_ID=123456
 SHOPEE_SANDBOX_PARTNER_KEY=replace_me
-SHOPEE_SANDBOX_REDIRECT_URL=https://hamimih.com/shop/auth
+SHOPEE_SANDBOX_REDIRECT_URL=https://staging.hamimih.com/shop/auth/
 
 SHOPEE_PROD_BASE_URL=https://partner.shopeemobile.com
 SHOPEE_PROD_PARTNER_ID=123456
 SHOPEE_PROD_PARTNER_KEY=replace_me
-SHOPEE_PROD_REDIRECT_URL=https://hamimih.com/shop/auth
+SHOPEE_PROD_REDIRECT_URL=https://hamimih.com/shop/auth/
 ```
 
 `SHOPEE_*_PARTNER_ID` must be a numeric uint32 integer string. Do not use placeholders such as `your_partner_id` in a real `.env` file.
