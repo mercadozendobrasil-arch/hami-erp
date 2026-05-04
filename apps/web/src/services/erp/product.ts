@@ -14,6 +14,19 @@ export async function createErpProduct(payload: ERP.ProductSavePayload) {
   });
 }
 
+export async function updateOnlineProduct(
+  productId: string,
+  payload: ERP.ProductOnlineUpdatePayload,
+) {
+  return request<ERP.ApiResponse<ERP.ProductListItem>>(
+    `/api/erp/products/${productId}/online`,
+    {
+      method: 'PATCH',
+      data: payload,
+    },
+  );
+}
+
 export async function queryMissingSkuMappings(params: ERP.SkuMappingQueryParams) {
   return request<API.ListResponse<ERP.MissingSkuMappingItem>>(
     '/api/erp/products/sku-mappings/missing',

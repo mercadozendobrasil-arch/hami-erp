@@ -10,7 +10,11 @@ import { ShopeeTokenService } from 'src/common/shopee-token.service';
 import { PrismaService } from 'src/infra/database/prisma.service';
 import { ProductSdk } from 'src/shopee-sdk/modules/product.sdk';
 
-import { BindErpSkuMappingDto, CreateErpProductDto } from './dto/erp-product.dto';
+import {
+  BindErpSkuMappingDto,
+  CreateErpProductDto,
+  UpdateOnlineErpProductDto,
+} from './dto/erp-product.dto';
 import { ErpProductQueryDto, ErpSkuQueryDto } from './dto/erp-product-query.dto';
 
 @Injectable()
@@ -431,6 +435,137 @@ export class ErpProductsService {
         jobId: job.id,
         productId,
         status: job.status,
+      },
+    };
+  }
+
+  async updateOnlineProduct(productId: string, payload: UpdateOnlineErpProductDto) {
+    const product = await this.prismaService.erpProduct.findUnique({
+      where: { id: productId },
+      include: {
+        skus: true,
+        platformProducts: {
+          where: { shopId: payload.shopId },
+          include: { skus: true },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('ERP product not found.');
+    }
+
+    const platformProduct = product.platformProducts[0];
+    if (!platformProduct?.itemId) {
+      throw new NotFoundException('Shopee item binding not found for this product.');
+    }
+
+    const shopId = BigInt(payload.shopId);
+    const { token } =
+      await this.shopeeTokenService.findRequiredTokenByShopId(shopId);
+    const context = {
+      shopId: Number(shopId),
+      accessToken: token.accessToken,
+    };
+    const itemId = Number(platformProduct.itemId);
+    const result: Record<string, unknown> = {};
+
+    const itemPayload: Record<string, unknown> = {};
+    if (payload.title !== undefined) itemPayload.itemName = payload.title;
+    if (payload.description !== undefined) {
+      itemPayload.description = payload.description;
+    }
+
+    if (Object.keys(itemPayload).length) {
+      result.item = await this.productSdk.updateItem(context, itemId, itemPayload);
+    }
+
+    const firstPlatformSku = platformProduct.skus[0];
+    if (payload.price !== undefined) {
+      result.price = await this.productSdk.updatePrice(context, {
+        itemId,
+        models: [
+          {
+            modelId: this.optionalNumber(firstPlatformSku?.modelId),
+            originalPrice: payload.price,
+          },
+        ],
+      });
+    }
+
+    if (payload.stock !== undefined) {
+      result.stock = await this.productSdk.updateStock(context, {
+        itemId,
+        models: [
+          {
+            modelId: this.optionalNumber(firstPlatformSku?.modelId),
+            sellerStock: payload.stock,
+          },
+        ],
+      });
+    }
+
+    const updated = await this.prismaService.erpProduct.update({
+      where: { id: product.id },
+      data: {
+        title: payload.title ?? undefined,
+        description: payload.description ?? undefined,
+        price: this.optionalDecimal(payload.price),
+        skus: product.skus[0]
+          ? {
+              update: {
+                where: { id: product.skus[0].id },
+                data: {
+                  price: this.optionalDecimal(payload.price),
+                  stock: payload.stock ?? undefined,
+                },
+              },
+            }
+          : payload.stock !== undefined || payload.price !== undefined
+            ? {
+                create: {
+                  skuCode: product.parentSku ?? `SHOPEE-${payload.shopId}-${itemId}`,
+                  price: this.optionalDecimal(payload.price),
+                  stock: payload.stock ?? 0,
+                },
+              }
+            : undefined,
+        platformProducts: {
+          update: {
+            where: { id: platformProduct.id },
+            data: {
+              title: payload.title ?? undefined,
+              raw: this.toJson({
+                ...this.asRecord(platformProduct.raw),
+                onlineUpdate: {
+                  ...payload,
+                  itemId,
+                  updatedAt: new Date().toISOString(),
+                },
+              }),
+              lastSyncedAt: new Date(),
+            },
+          },
+        },
+      },
+      include: { skus: true, platformProducts: true },
+    });
+
+    await this.recordMappingLog({
+      productId,
+      shopId: payload.shopId,
+      itemId: platformProduct.itemId,
+      action: 'UPDATE_ONLINE_PRODUCT',
+      status: 'SUCCESS',
+      request: payload,
+      response: result,
+    });
+
+    return {
+      success: true,
+      data: {
+        ...this.toListItem(updated),
+        result,
       },
     };
   }

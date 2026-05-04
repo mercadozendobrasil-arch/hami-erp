@@ -16,11 +16,14 @@ import {
   DatePicker,
   Dropdown,
   Empty,
+  Form,
   Image,
   Input,
+  InputNumber,
   Layout,
   Menu,
   message,
+  Modal,
   Select,
   Space,
   Tag,
@@ -33,6 +36,7 @@ import {
   queryProducts,
   syncRemoteProducts,
   syncProduct,
+  updateOnlineProduct,
   unlistProduct,
 } from '@/services/erp/product';
 import { queryShops } from '@/services/erp/shop';
@@ -92,6 +96,16 @@ function getProductId(record: ProductRecord) {
   );
 }
 
+function getLocalProductId(record: ProductRecord) {
+  return String(pickFirst(record, ['productId', 'id']) || '');
+}
+
+function getShopeeItemId(record: ProductRecord) {
+  return String(
+    pickFirst(record, ['itemId', 'platformProductId', 'item_id']) || '',
+  );
+}
+
 function getProductImage(record: ProductRecord) {
   return pickFirst(record, [
     'image',
@@ -125,6 +139,9 @@ const ProductListPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string]>();
   const [status, setStatus] = useState('ACTIVE');
   const [selectedRows, setSelectedRows] = useState<ProductRecord[]>([]);
+  const [editingProduct, setEditingProduct] = useState<ProductRecord>();
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editForm] = Form.useForm<ERP.ProductOnlineUpdatePayload>();
 
   const { data: shopsResponse } = useQuery({
     queryKey: ['product-list-shops'],
@@ -150,6 +167,39 @@ const ProductListPage: React.FC = () => {
 
   const unavailable = () => messageApi.info('暂未接入');
 
+  const openEdit = (record: ProductRecord) => {
+    setEditingProduct(record);
+    editForm.setFieldsValue({
+      shopId: getShopId(record, shopId),
+      title: record.title,
+      price: record.price === undefined ? undefined : Number(record.price),
+      stock: record.stock === undefined ? undefined : Number(record.stock),
+    });
+  };
+
+  const submitEdit = async () => {
+    if (!editingProduct) return;
+    const productId = getLocalProductId(editingProduct);
+    if (!productId) {
+      messageApi.error('缺少本地商品ID，无法编辑在线商品');
+      return;
+    }
+
+    try {
+      const values = await editForm.validateFields();
+      setEditSubmitting(true);
+      await updateOnlineProduct(productId, values);
+      messageApi.success('已更新 Shopee 在线商品');
+      setEditingProduct(undefined);
+      actionRef.current?.reload();
+    } catch (error) {
+      if ((error as { errorFields?: unknown[] })?.errorFields) return;
+      messageApi.error(error instanceof Error ? error.message : '在线商品编辑失败');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const syncRemote = async () => {
     if (!shopId) return;
     try {
@@ -164,7 +214,7 @@ const ProductListPage: React.FC = () => {
 
   const syncOne = async (record: ProductRecord) => {
     try {
-      await syncProduct(getProductId(record), getShopId(record, shopId));
+      await syncProduct(getLocalProductId(record), getShopId(record, shopId));
       messageApi.success('已触发同步');
       actionRef.current?.reload();
     } catch {
@@ -174,7 +224,7 @@ const ProductListPage: React.FC = () => {
 
   const unlistOne = async (record: ProductRecord) => {
     try {
-      await unlistProduct(getProductId(record), getShopId(record, shopId));
+      await unlistProduct(getLocalProductId(record), getShopId(record, shopId));
       messageApi.success('已提交下架');
       actionRef.current?.reload();
     } catch {
@@ -227,7 +277,7 @@ const ProductListPage: React.FC = () => {
             {pickFirst(record, ['parentSku', 'parentSKU', 'sku']) || '-'}
           </Typography.Text>
           <Typography.Link copyable>
-            {getProductId(record) || '-'}
+            {getShopeeItemId(record) || getLocalProductId(record) || '-'}
           </Typography.Link>
         </Space>
       ),
@@ -309,7 +359,7 @@ const ProductListPage: React.FC = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space direction="vertical" size={2}>
-          <Button type="link" size="small" onClick={unavailable}>
+          <Button type="link" size="small" onClick={() => openEdit(record)}>
             编辑
           </Button>
           <Dropdown
@@ -374,6 +424,44 @@ const ProductListPage: React.FC = () => {
         />
       </Sider>
       <Content className="erp-content">
+        <Modal
+          title="编辑在线商品"
+          open={Boolean(editingProduct)}
+          confirmLoading={editSubmitting}
+          onOk={submitEdit}
+          onCancel={() => setEditingProduct(undefined)}
+          destroyOnClose
+        >
+          <Form form={editForm} layout="vertical" preserve={false}>
+            <Form.Item name="shopId" label="店铺" rules={[{ required: true }]}>
+              <Input disabled />
+            </Form.Item>
+            <Form.Item
+              name="title"
+              label="商品标题"
+              rules={[{ required: true, message: '请输入商品标题' }]}
+            >
+              <Input maxLength={120} showCount />
+            </Form.Item>
+            <Form.Item name="description" label="商品描述">
+              <Input.TextArea rows={5} maxLength={3000} showCount />
+            </Form.Item>
+            <Form.Item
+              name="price"
+              label="价格"
+              rules={[{ required: true, message: '请输入价格' }]}
+            >
+              <InputNumber min={0} precision={2} style={{ width: '100%' }} prefix="R$" />
+            </Form.Item>
+            <Form.Item
+              name="stock"
+              label="库存"
+              rules={[{ required: true, message: '请输入库存' }]}
+            >
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Form>
+        </Modal>
         <div className="erp-filterbar">
           <Input.Search
             allowClear

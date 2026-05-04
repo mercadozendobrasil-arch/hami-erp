@@ -116,6 +116,29 @@ export class CreateErpProductDto {
   skus?: ErpSkuInputDto[];
 }
 
+export class UpdateOnlineErpProductDto {
+  @IsString()
+  shopId!: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stock?: number;
+}
+
 export class BindErpSkuMappingDto {
   @IsString()
   shopId!: string;

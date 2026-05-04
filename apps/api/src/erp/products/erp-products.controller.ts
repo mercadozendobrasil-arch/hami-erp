@@ -1,6 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
-import { BindErpSkuMappingDto, CreateErpProductDto } from './dto/erp-product.dto';
+import {
+  BindErpSkuMappingDto,
+  CreateErpProductDto,
+  UpdateOnlineErpProductDto,
+} from './dto/erp-product.dto';
 import { ErpProductQueryDto, ErpSkuQueryDto } from './dto/erp-product-query.dto';
 import { ErpProductsService } from './erp-products.service';
 
@@ -60,6 +64,14 @@ export class ErpProductsController {
     @Query('shopId') shopId?: string,
   ) {
     return this.erpProductsService.syncProduct(productId, shopId);
+  }
+
+  @Patch(':productId/online')
+  updateOnlineProduct(
+    @Param('productId') productId: string,
+    @Body() payload: UpdateOnlineErpProductDto,
+  ) {
+    return this.erpProductsService.updateOnlineProduct(productId, payload);
   }
 
   @Post(':productId/unlist')

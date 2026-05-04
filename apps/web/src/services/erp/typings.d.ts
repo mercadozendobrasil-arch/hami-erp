@@ -313,6 +313,14 @@ declare namespace ERP {
     }>;
   };
 
+  type ProductOnlineUpdatePayload = {
+    shopId: string;
+    title?: string;
+    description?: string;
+    price?: number;
+    stock?: number;
+  };
+
   type SkuMappingQueryParams = PageParams & {
     shopId?: string;
   };
