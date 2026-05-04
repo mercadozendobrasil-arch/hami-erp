@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ErpPlatformPublishStatus,
   ErpProductStatus,
@@ -478,19 +478,26 @@ export class ErpProductsService {
 
     if (Object.keys(itemPayload).length) {
       result.item = await this.productSdk.updateItem(context, itemId, itemPayload);
+      this.assertShopeeActionOk(result.item, 'Update item');
     }
 
     const firstPlatformSku = platformProduct.skus[0];
+    const modelId =
+      this.optionalNumber(firstPlatformSku?.modelId) ??
+      (payload.price !== undefined || payload.stock !== undefined
+        ? await this.resolveFirstShopeeModelId(context, itemId)
+        : undefined);
     if (payload.price !== undefined) {
       result.price = await this.productSdk.updatePrice(context, {
         itemId,
         models: [
           {
-            modelId: this.optionalNumber(firstPlatformSku?.modelId),
+            modelId,
             originalPrice: payload.price,
           },
         ],
       });
+      this.assertShopeeActionOk(result.price, 'Update price');
     }
 
     if (payload.stock !== undefined) {
@@ -498,11 +505,12 @@ export class ErpProductsService {
         itemId,
         models: [
           {
-            modelId: this.optionalNumber(firstPlatformSku?.modelId),
+            modelId,
             sellerStock: payload.stock,
           },
         ],
       });
+      this.assertShopeeActionOk(result.stock, 'Update stock');
     }
 
     const updated = await this.prismaService.erpProduct.update({
@@ -568,6 +576,32 @@ export class ErpProductsService {
         result,
       },
     };
+  }
+
+  private async resolveFirstShopeeModelId(
+    context: { shopId: number; accessToken: string },
+    itemId: number,
+  ) {
+    const modelList = await this.productSdk.getModelList(context, itemId);
+    const firstModel = this.arrayRecords(
+      (modelList as Record<string, unknown>).model,
+    )[0];
+
+    return this.optionalNumber(firstModel?.model_id ?? firstModel?.modelId);
+  }
+
+  private assertShopeeActionOk(result: unknown, action: string) {
+    const record = this.asRecord(result);
+    const message = this.optionalString(record.message);
+    if (
+      record.success === false ||
+      this.optionalString(record.error) ||
+      message?.toLowerCase().includes('failed')
+    ) {
+      throw new BadRequestException(
+        `${action} rejected by Shopee: ${message ?? record.error ?? JSON.stringify(result)}`,
+      );
+    }
   }
 
   async unlistProduct(productId: string, shopId?: string) {
