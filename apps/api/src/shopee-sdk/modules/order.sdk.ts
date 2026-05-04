@@ -23,6 +23,24 @@ export interface ShopeeShipOrderInput {
   nonIntegrated?: Record<string, unknown>;
 }
 
+export const ORDER_DETAIL_RESPONSE_OPTIONAL_FIELDS = [
+  'buyer_user_id',
+  'buyer_username',
+  'item_list',
+  'total_amount',
+  'currency',
+  'order_status',
+  'payment_method',
+  'create_time',
+  'update_time',
+  'shipping_carrier',
+  'checkout_shipping_carrier',
+  'recipient_address',
+  'message_to_seller',
+  'invoice_data',
+  'payment_info',
+].join(',');
+
 @Injectable()
 export class OrderSdk {
   constructor(
@@ -58,8 +76,7 @@ export class OrderSdk {
       method: 'GET',
       query: {
         order_sn_list: orderSn,
-        response_optional_fields:
-          'buyer_user_id,buyer_username,item_list,total_amount,currency,order_status,payment_method,create_time,update_time,package_list,shipping_carrier,checkout_shipping_carrier,recipient_address,message_to_seller,invoice_data,payment_info',
+        response_optional_fields: ORDER_DETAIL_RESPONSE_OPTIONAL_FIELDS,
       },
     });
   }

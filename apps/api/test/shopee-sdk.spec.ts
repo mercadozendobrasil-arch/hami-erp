@@ -6,6 +6,7 @@ import { ShopeeSignature } from '../src/shopee-sdk/shopee-signature';
 import { ShopeeErrorMapper } from '../src/shopee-sdk/shopee-error.mapper';
 import { ShopeeHttpService } from '../src/shopee-sdk/shopee-http.service';
 import { AuthSdk } from '../src/shopee-sdk/modules/auth.sdk';
+import { ORDER_DETAIL_RESPONSE_OPTIONAL_FIELDS } from '../src/shopee-sdk/modules/order.sdk';
 import { ProductSdk } from '../src/shopee-sdk/modules/product.sdk';
 
 describe('Shopee SDK self-hosted client', () => {
@@ -32,6 +33,8 @@ describe('Shopee SDK self-hosted client', () => {
         SHOPEE_SANDBOX_PARTNER_KEY: 'sandbox-key',
         SHOPEE_SANDBOX_REDIRECT_URL: 'https://sandbox.example.com/callback',
         SHOPEE_PROD_PARTNER_ID: '2002',
+        SHOPEE_PROD_PARTNER_KEY: '',
+        SHOPEE_PROD_REDIRECT_URL: '',
       }),
     );
 
@@ -166,5 +169,11 @@ describe('Shopee SDK self-hosted client', () => {
       code: 'code',
       shop_id: 123,
     });
+  });
+
+  it('does not request order detail fields rejected by Shopee sandbox', () => {
+    expect(ORDER_DETAIL_RESPONSE_OPTIONAL_FIELDS.split(',')).not.toContain(
+      'package_list',
+    );
   });
 });

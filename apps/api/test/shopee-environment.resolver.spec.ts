@@ -69,6 +69,8 @@ describe('ShopeeEnvironmentResolver', () => {
       SHOPEE_SANDBOX_PARTNER_KEY: 'sandbox-key',
       SHOPEE_SANDBOX_REDIRECT_URL: 'https://sandbox.example.com/callback',
       SHOPEE_PROD_PARTNER_ID: '2002',
+      SHOPEE_PROD_PARTNER_KEY: '',
+      SHOPEE_PROD_REDIRECT_URL: '',
     });
 
     expect(resolver.getCurrentConfig().env).toBe('sandbox');
