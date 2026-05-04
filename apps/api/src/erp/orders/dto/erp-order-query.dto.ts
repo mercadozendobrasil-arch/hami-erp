@@ -18,6 +18,10 @@ export class ErpOrderQueryDto {
 
   @IsOptional()
   @IsString()
+  token?: string;
+
+  @IsOptional()
+  @IsString()
   currentTab?: string;
 
   @IsOptional()
@@ -62,6 +66,10 @@ export class ErpOrderStatusCountQueryDto {
   @IsOptional()
   @IsString()
   shopId?: string;
+
+  @IsOptional()
+  @IsString()
+  token?: string;
 }
 
 export class ErpOrderLogQueryDto {
