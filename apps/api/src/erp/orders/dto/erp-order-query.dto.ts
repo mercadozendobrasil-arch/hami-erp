@@ -17,6 +17,13 @@ export class ErpOrderQueryDto {
   shopId?: string;
 
   @IsOptional()
+  @IsString()
+  currentTab?: string;
+
+  @IsOptional()
+  sorter?: unknown;
+
+  @IsOptional()
   @IsIn(ERP_FULFILLMENT_STAGES)
   fulfillmentStage?: ErpFulfillmentStage;
 
