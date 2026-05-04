@@ -30,6 +30,16 @@ const ShopListPage: React.FC = () => {
   const { message } = App.useApp();
   const actionRef = useRef<ActionType | null>(null);
   const [syncingShopId, setSyncingShopId] = useState<string>();
+  const [firstShopId, setFirstShopId] = useState<string>();
+
+  const getShopPath = (basePath: string, shopId?: string) =>
+    shopId ? `${basePath}?shopId=${shopId}` : basePath;
+
+  const loadShops = async (params: ERP.PageParams) => {
+    const response = await queryShops(params);
+    setFirstShopId(response.data?.[0]?.shopId);
+    return response;
+  };
 
   const handleSyncOrders = async (record: ERP.ShopListItem) => {
     setSyncingShopId(record.shopId);
@@ -151,7 +161,7 @@ const ShopListPage: React.FC = () => {
             type="link"
             size="small"
             icon={<ShoppingCartOutlined />}
-            onClick={() => history.push(`/order/pending?shopId=${record.shopId}`)}
+            onClick={() => history.push(`/order/all?shopId=${record.shopId}`)}
           >
             订单
           </Button>
@@ -182,7 +192,7 @@ const ShopListPage: React.FC = () => {
           defaultCollapsed: false,
         }}
         columns={columns}
-        request={queryShops}
+        request={loadShops}
         scroll={{ x: 1320 }}
         pagination={{
           pageSize: 10,
@@ -208,14 +218,16 @@ const ShopListPage: React.FC = () => {
           <Button
             key="products"
             icon={<ProductOutlined />}
-            onClick={() => history.push('/product/list')}
+            disabled={!firstShopId}
+            onClick={() => history.push(getShopPath('/product/list', firstShopId))}
           >
             查看商品
           </Button>,
           <Button
             key="orders"
             icon={<ShoppingCartOutlined />}
-            onClick={() => history.push('/order/all')}
+            disabled={!firstShopId}
+            onClick={() => history.push(getShopPath('/order/all', firstShopId))}
           >
             查看订单
           </Button>,
