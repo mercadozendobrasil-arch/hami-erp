@@ -5,6 +5,7 @@ import { ShopeeClient } from '../src/shopee-sdk/shopee-client';
 import { ShopeeSignature } from '../src/shopee-sdk/shopee-signature';
 import { ShopeeErrorMapper } from '../src/shopee-sdk/shopee-error.mapper';
 import { ShopeeHttpService } from '../src/shopee-sdk/shopee-http.service';
+import { AuthSdk } from '../src/shopee-sdk/modules/auth.sdk';
 import { ProductSdk } from '../src/shopee-sdk/modules/product.sdk';
 
 describe('Shopee SDK self-hosted client', () => {
@@ -19,7 +20,7 @@ describe('Shopee SDK self-hosted client', () => {
 
     expect(resolver.getCurrentConfig().env).toBe('sandbox');
     expect(resolver.getCurrentConfig().baseUrl).toBe(
-      'https://partner.test-stable.shopeemobile.com',
+      'https://openplatform.sandbox.test-stable.shopee.sg',
     );
   });
 
@@ -97,6 +98,73 @@ describe('Shopee SDK self-hosted client', () => {
       category_id: 321,
       original_price: 10,
       item_name: 'Demo product',
+    });
+  });
+
+  it('accepts token payloads returned at the top level by Shopee auth endpoints', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          expire_in: 14400,
+          request_id: 'request-token',
+          shop_id_list: [123],
+          error: '',
+          message: '',
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+    const config = {
+      baseUrl: 'https://openplatform.sandbox.test-stable.shopee.sg',
+      environment: 'sandbox' as const,
+      apiVersion: 'v2',
+      partnerId: 1001,
+      partnerKey: 'sandbox-key',
+      timeoutMs: 1000,
+      retry: {
+        maxAttempts: 1,
+        baseDelayMs: 0,
+        maxDelayMs: 0,
+      },
+      rateLimit: {
+        minIntervalMs: 0,
+      },
+      fetchImpl,
+    };
+    const signature = new ShopeeSignature(config);
+    const client = new ShopeeClient(
+      new ShopeeHttpService(
+        config,
+        { log: jest.fn() },
+        signature,
+        new ShopeeErrorMapper(),
+      ),
+      signature,
+    );
+    const authSdk = new AuthSdk(client);
+
+    await expect(
+      authSdk.getAccessToken({ code: 'code', shopId: 123n }),
+    ).resolves.toMatchObject({
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      expire_in: 14400,
+      request_id: 'request-token',
+    });
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    const requestBody = typeof init.body === 'string' ? init.body : '';
+
+    expect(new URL(url).pathname).toBe('/api/v2/auth/token/get');
+    expect(JSON.parse(requestBody)).toEqual({
+      partner_id: 1001,
+      code: 'code',
+      shop_id: 123,
     });
   });
 });

@@ -163,14 +163,17 @@ model JobRecord {
 }
 
 model ErpSystemUser {
-  id          String              @id @default(cuid())
-  username    String              @unique
-  displayName String?
-  email       String?
-  active      Boolean             @default(true)
-  roles       ErpSystemUserRole[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  username          String              @unique
+  displayName       String?
+  email             String?
+  passwordHash      String?
+  active            Boolean             @default(true)
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  roles             ErpSystemUserRole[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([active])
   @@index([username])

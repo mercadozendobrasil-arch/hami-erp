@@ -151,7 +151,10 @@ export class ShopeeHttpService {
         throw this.errorMapper.mapApiError(payload, response.status);
       }
 
-      if (payload.response === undefined) {
+      const responsePayload =
+        payload.response ?? this.extractTopLevelResponse<TResponse>(payload);
+
+      if (responsePayload === undefined) {
         throw new ShopeeSdkError({
           code: 'INVALID_RESPONSE',
           message: 'Shopee API response is missing the response payload',
@@ -164,7 +167,7 @@ export class ShopeeHttpService {
 
       const normalized: ShopeeApiResponse<TResponse> = {
         ok: true,
-        data: payload.response,
+        data: responsePayload,
         statusCode: response.status,
         requestId: payload.request_id ?? null,
         warning: payload.warning ?? null,
@@ -339,6 +342,19 @@ export class ShopeeHttpService {
         cause: error,
       });
     }
+  }
+
+  private extractTopLevelResponse<TResponse>(
+    payload: ShopeeApiEnvelope<TResponse>,
+  ): TResponse | undefined {
+    const { error, message, request_id, response, warning, ...data } =
+      payload as ShopeeApiEnvelope<TResponse> & Record<string, unknown>;
+
+    if (Object.keys(data).length === 0) {
+      return undefined;
+    }
+
+    return payload as unknown as TResponse;
   }
 
   private appendQueryValues(

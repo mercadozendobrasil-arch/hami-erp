@@ -64,6 +64,16 @@ export async function syncProduct(itemId: string, shopId: string) {
   );
 }
 
+export async function syncRemoteProducts(shopId: string) {
+  return request<ERP.ApiResponse<Record<string, unknown>>>(
+    '/api/erp/products/sync-remote',
+    {
+      method: 'POST',
+      params: { shopId },
+    },
+  );
+}
+
 export async function unlistProduct(itemId: string, shopId: string) {
   return request<ERP.ApiResponse<Record<string, unknown>>>(
     `/api/erp/products/${itemId}/unlist`,

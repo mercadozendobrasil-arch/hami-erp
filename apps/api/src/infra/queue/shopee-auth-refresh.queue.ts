@@ -62,7 +62,7 @@ export class ShopeeAuthRefreshQueueService {
   }
 
   private createJobId(shopId: bigint) {
-    return `shopee-auth-refresh:${shopId.toString()}`;
+    return `shopee-auth-refresh-${shopId.toString()}`;
   }
 }
 

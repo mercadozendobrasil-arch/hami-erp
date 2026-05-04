@@ -74,7 +74,7 @@ const AbnormalOrderPage: React.FC = () => {
       dataIndex: 'orderNo',
       width: 180,
       render: (_, record) => (
-        <a onClick={() => history.push(`/order/detail/${record.id}`)}>{record.orderNo}</a>
+        <a onClick={() => history.push(`/order/detail/${record.id}?shopId=${record.platformShopId}`)}>{record.orderNo}</a>
       ),
     },
     {

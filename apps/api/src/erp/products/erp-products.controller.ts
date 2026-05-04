@@ -41,6 +41,11 @@ export class ErpProductsController {
     return this.erpProductsService.listSkus(query);
   }
 
+  @Post('sync-remote')
+  syncRemoteProducts(@Query('shopId') shopId: string) {
+    return this.erpProductsService.syncRemoteProducts(shopId);
+  }
+
   @Get(':productId')
   getProduct(
     @Param('productId') productId: string,

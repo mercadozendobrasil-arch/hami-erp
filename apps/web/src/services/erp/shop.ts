@@ -1,11 +1,11 @@
 import { request } from '@umijs/max';
 
-export async function getShopeeAuthUrl() {
+export async function getShopeeAuthUrl(redirectUri?: string) {
   const response = await request<
     ERP.ShopeeAuthUrlResponse & { authorizationUrl?: string; redirectUri?: string }
   >('/api/shopee/auth/authorize-url', {
     method: 'POST',
-    data: {},
+    data: redirectUri ? { redirectUri } : {},
   });
 
   return {
@@ -29,10 +29,29 @@ export async function submitShopeeAuthCallback(payload: {
 }
 
 export async function queryShops(params: ERP.PageParams) {
-  return request<API.ListResponse<ERP.ShopListItem>>('/api/shopee/shops', {
+  const response = await request<API.ListResponse<ERP.ShopListItem> | ERP.ShopListItem[]>('/api/shopee/shops', {
     method: 'GET',
     params,
   });
+
+  if (Array.isArray(response)) {
+    return {
+      success: true,
+      data: response,
+      total: response.length,
+      current: params.current ?? 1,
+      pageSize: params.pageSize ?? 20,
+    };
+  }
+
+  return {
+    ...response,
+    success: response.success ?? true,
+    data: response.data || [],
+    total: response.total ?? response.data?.length ?? 0,
+    current: response.current ?? params.current ?? 1,
+    pageSize: response.pageSize ?? params.pageSize ?? 20,
+  };
 }
 
 export async function syncShop(shopId: string) {

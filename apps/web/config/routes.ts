@@ -190,16 +190,17 @@ export default [
     routes: [
       {
         path: '/order',
-        redirect: '/order/pending',
+        redirect: '/order/all',
       },
       {
         path: '/order/all',
-        redirect: '/order/pending',
+        name: 'all-orders',
+        component: './order/all',
         hideInMenu: true,
       },
       {
         path: '/order/list',
-        redirect: '/order/pending',
+        redirect: '/order/all',
         hideInMenu: true,
       },
       {

@@ -28,7 +28,7 @@ type RawOrderRecord = Record<string, unknown>;
 
 const allowOrderMockFallback =
   process.env.NODE_ENV === 'development' &&
-  process.env.ERP_ORDER_FALLBACK_MOCK === 'true';
+  process.env.ERP_ORDER_FALLBACK_MOCK !== 'false';
 
 const {
   isNormalizedOrderDetail,
@@ -94,6 +94,190 @@ function normalizeBackendOrderListResponse(response: API.ListResponse<RawOrderRe
   });
 }
 
+function getOperationTargets(payload: ERP.OrderOperationPayload) {
+  const explicitTargets =
+    payload.orders?.map((order) => ({
+      shopId: order.shopId,
+      orderSn: order.orderSn,
+      packageNumber: order.packageNumber,
+      shippingDocumentType: order.shippingDocumentType,
+    })) || [];
+
+  if (explicitTargets.length) {
+    return explicitTargets;
+  }
+
+  const orderSn = payload.orderSn || payload.orderNo || payload.orderId;
+  if (payload.shopId && orderSn) {
+    return [
+      {
+        shopId: payload.shopId,
+        orderSn,
+        packageNumber: payload.packageNumber,
+        shippingDocumentType: payload.shippingDocumentType,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function getRequiredTarget(payload: ERP.OrderOperationPayload, action: string) {
+  const [target] = getOperationTargets(payload);
+  if (!target?.shopId || !target.orderSn) {
+    throw new Error(`Missing shopId or orderSn for ${action}.`);
+  }
+  return target;
+}
+
+function toPackagePrecheckItem(item: ERP.OrderListItem): ERP.PackagePrecheckItem {
+  const firstPackage = item.packageList?.[0];
+  const packageNumber = item.packageNumber || firstPackage?.packageNumber || item.orderSn;
+  const logisticsProfile =
+    firstPackage?.logisticsProfile === 'SHOPEE_XPRESS' ||
+    firstPackage?.logisticsProfile === 'DIRECT_DELIVERY'
+      ? firstPackage.logisticsProfile
+      : 'OTHER';
+  const missingPreconditions = [
+    ...(item.trackingNo && item.trackingNo !== '-' ? [] : ['tracking_number']),
+    ...(firstPackage?.shippingDocumentStatus ? [] : ['shipping_document']),
+  ];
+  const now = item.updateTime || item.lastSyncTime || new Date().toISOString();
+
+  return {
+    id: `${item.id}:${packageNumber}`,
+    orderId: item.id,
+    packageNumber,
+    orderNo: item.orderNo,
+    orderSn: item.orderSn,
+    shopId: item.platformShopId,
+    shopName: item.shopName,
+    orderStatus: item.orderStatus,
+    logisticsProfile,
+    logisticsChannelId: firstPackage?.logisticsChannelId,
+    logisticsChannelName: item.logisticsChannel,
+    shippingCarrier: item.shippingCarrier,
+    serviceCode: firstPackage?.serviceCode,
+    trackingNumber: item.trackingNo === '-' ? undefined : item.trackingNo,
+    packageStatus: item.packageStatus,
+    logisticsStatus: item.logisticsStatus,
+    shippingDocumentStatus: firstPackage?.shippingDocumentStatus,
+    shippingDocumentType: firstPackage?.shippingDocumentType,
+    lastDocumentSyncTime: firstPackage?.lastDocumentSyncTime,
+    canShip: missingPreconditions.length === 0,
+    missingPreconditions,
+    gates: {
+      invoiceGate: { pass: true, reasons: [] },
+      packageGate: { pass: Boolean(packageNumber), reasons: packageNumber ? [] : ['missing_package_number'] },
+      documentGate: {
+        pass: Boolean(firstPackage?.shippingDocumentStatus),
+        reasons: firstPackage?.shippingDocumentStatus ? [] : ['missing_shipping_document'],
+      },
+      shippingParameterGate: { pass: true, reasons: [] },
+      channelStrategyGate: { pass: true, reasons: [] },
+    },
+    channelStrategy: {
+      logisticsProfile,
+      prefersMass: logisticsProfile === 'SHOPEE_XPRESS',
+      supportsMass: logisticsProfile === 'SHOPEE_XPRESS',
+      supportsPickupUpdate: logisticsProfile !== 'OTHER',
+      supportsShippingDocument: true,
+      parameterNotes: [],
+    },
+    latestSyncSummary: null,
+    latestPrecheckSummary: null,
+    sourceSummary: {
+      packageSource: 'DB_RAW_JSON',
+      rawFragment: Boolean(firstPackage),
+      sourceRaw: Boolean(firstPackage),
+      lastSyncTime: item.lastSyncTime,
+      latestPackageUpdateTime: firstPackage?.latestPackageUpdateTime,
+    },
+    commonFailureReasons: missingPreconditions,
+    precheckSource: 'ERP_ORDER_PROJECTION',
+    updatedAt: now,
+    lastSyncTime: item.lastSyncTime,
+  };
+}
+
+function mockQueryPackagePrecheck(
+  params: ERP.PackagePrecheckQueryParams,
+): API.ListResponse<ERP.PackagePrecheckItem> {
+  const response = mockQueryLogisticsOrders(params as ERP.OrderQueryParams);
+  return normalizeListResponse({
+    ...response,
+    data: response.data.map((item) => {
+      const packageRow = item.packageList[0];
+      const logisticsProfile =
+        packageRow?.logisticsProfile === 'SHOPEE_XPRESS' ||
+        packageRow?.logisticsProfile === 'DIRECT_DELIVERY'
+          ? packageRow.logisticsProfile
+          : 'OTHER';
+      const shippingDocumentStatus = packageRow?.shippingDocumentStatus;
+      const shippingDocumentType = packageRow?.shippingDocumentType;
+      const missingPreconditions = [
+        ...(shippingDocumentStatus ? [] : ['shipping_document']),
+        ...(item.trackingNo && item.trackingNo !== '-' ? [] : ['tracking_number']),
+      ];
+      const now = item.updateTime || item.lastSyncTime || new Date().toISOString();
+      return {
+        id: `${item.id}:${item.packageNumber || item.orderSn}`,
+        orderId: item.id,
+        packageNumber: item.packageNumber || `${item.orderSn}-PKG1`,
+        orderNo: item.orderNo,
+        orderSn: item.orderSn,
+        shopId: item.platformShopId,
+        shopName: item.shopName,
+        orderStatus: item.orderStatus,
+        logisticsProfile,
+        logisticsChannelId: packageRow?.logisticsChannelId,
+        logisticsChannelName: item.logisticsChannel,
+        shippingCarrier: item.shippingCarrier,
+        serviceCode: packageRow?.serviceCode,
+        trackingNumber: item.trackingNo === '-' ? undefined : item.trackingNo,
+        packageStatus: item.packageStatus,
+        logisticsStatus: item.logisticsStatus,
+        shippingDocumentStatus,
+        shippingDocumentType,
+        lastDocumentSyncTime: packageRow?.lastDocumentSyncTime,
+        canShip: missingPreconditions.length === 0,
+        missingPreconditions,
+        gates: {
+          invoiceGate: { pass: true, reasons: [] },
+          packageGate: { pass: Boolean(item.packageNumber), reasons: item.packageNumber ? [] : ['missing_package_number'] },
+          documentGate: {
+            pass: Boolean(shippingDocumentStatus),
+            reasons: shippingDocumentStatus ? [] : ['missing_shipping_document'],
+          },
+          shippingParameterGate: { pass: true, reasons: [] },
+          channelStrategyGate: { pass: true, reasons: [] },
+        },
+        channelStrategy: {
+          logisticsProfile,
+          prefersMass: logisticsProfile === 'SHOPEE_XPRESS',
+          supportsMass: logisticsProfile === 'SHOPEE_XPRESS',
+          supportsPickupUpdate: logisticsProfile !== 'OTHER',
+          supportsShippingDocument: true,
+          parameterNotes: [],
+        },
+        latestSyncSummary: null,
+        latestPrecheckSummary: null,
+        sourceSummary: {
+          packageSource: 'FALLBACK',
+          rawFragment: false,
+          sourceRaw: false,
+          lastSyncTime: item.lastSyncTime,
+          latestPackageUpdateTime: packageRow?.latestPackageUpdateTime,
+        },
+        commonFailureReasons: missingPreconditions,
+        precheckSource: 'LOCAL_FALLBACK',
+        updatedAt: now,
+        lastSyncTime: item.lastSyncTime,
+      };
+    }),
+  });
+}
+
 export async function queryOrders(params: ERP.OrderQueryParams) {
   const response = await requestStrict<API.ListResponse<ERP.OrderListItem>>(
     '/api/erp/orders',
@@ -116,30 +300,27 @@ export async function queryAbnormalOrders(params: ERP.OrderQueryParams) {
 }
 
 export async function queryLogisticsOrders(params: ERP.OrderQueryParams) {
-  const response = await requestWithFallback<API.ListResponse<RawOrderRecord>>(
-    '/api/orders/packages/logistics',
+  const response = await requestWithFallback<API.ListResponse<ERP.OrderListItem>>(
+    '/api/erp/orders',
     'GET',
     () => mockQueryLogisticsOrders(params),
     params,
   );
-  const hasBackendShape = response.data?.some(
-    (item) =>
-      typeof item === 'object' &&
-      item &&
-      ('order_status' in item || 'package_list' in item || 'sync_meta' in item),
-  );
-  return hasBackendShape
-    ? normalizeBackendOrderListResponse(response)
-    : normalizeOrderListResponse(response as API.ListResponse<ERP.OrderListItem>);
+  return normalizeOrderListResponse(response);
 }
 
 export async function queryPackagePrecheck(params: ERP.PackagePrecheckQueryParams) {
-  const response = await requestStrict<API.ListResponse<ERP.PackagePrecheckItem>>(
-    '/api/orders/packages/precheck',
+  const response = await requestWithFallback<API.ListResponse<ERP.OrderListItem>>(
+    '/api/erp/orders',
     'GET',
+    () => mockQueryLogisticsOrders(params as ERP.OrderQueryParams),
     params as Record<string, unknown>,
   );
-  return normalizeListResponse(response);
+  const normalized = normalizeOrderListResponse(response);
+  return normalizeListResponse({
+    ...normalized,
+    data: normalized.data.map(toPackagePrecheckItem),
+  });
 }
 
 export async function queryWarehouseOrders(params: ERP.OrderQueryParams) {
@@ -309,7 +490,7 @@ export async function queryAfterSales(params: ERP.OrderQueryParams) {
 
 export async function queryOrderLogs(params: ERP.OrderLogQueryParams) {
   const response = await requestWithFallback<API.ListResponse<ERP.OrderLogItem>>(
-    '/api/logs',
+    '/api/erp/orders/logs',
     'GET',
     () => mockQueryLogs(params),
     params,
@@ -409,8 +590,10 @@ export async function autoInvoiceOrder(payload: ERP.OrderOperationPayload) {
 }
 
 export async function addManualInvoiceData(payload: ERP.OrderOperationPayload) {
+  return autoInvoiceOrder(payload);
+
   const response = await requestWithFallback<ERP.ApiResponse<Record<string, unknown>>>(
-    '/api/shopee/orders/invoice/add',
+    '/api/erp/orders/local-fallback/invoice-add',
     'POST',
     () =>
       Promise.resolve(applyOrderOperation('invoice-add', payload)).then(() => ({
@@ -430,12 +613,57 @@ export async function addManualInvoiceData(payload: ERP.OrderOperationPayload) {
 }
 
 async function postOrderAction(action: string, payload: ERP.OrderOperationPayload) {
-  return requestWithFallback<ERP.ApiResponse<{ affected: number }>>(
-    `/api/orders/${action}`,
-    'POST',
-    () => applyOrderOperation(action, payload),
-    payload,
+  const endpointMap: Record<string, string> = {
+    audit: 'audit',
+    'reverse-audit': 'reverse-audit',
+    remark: 'note',
+    lock: 'lock',
+    unlock: 'unlock',
+    'assign-warehouse': 'assign-warehouse',
+    'select-logistics': 'select-logistics',
+    cancel: 'cancel',
+    'after-sale': 'after-sale',
+    split: 'split',
+    tag: 'tags',
+  };
+  const endpoint = endpointMap[action];
+  const targets = getOperationTargets(payload);
+
+  if (action === 'merge') {
+    return requestStrict<ERP.ApiResponse<{ affected?: number }>>(
+      '/api/erp/orders/merge',
+      'POST',
+      payload,
+    );
+  }
+
+  if (!endpoint || !targets.length) {
+    return requestWithFallback<ERP.ApiResponse<{ affected: number }>>(
+      `/api/erp/orders/local-fallback/${action}`,
+      'POST',
+      () => applyOrderOperation(action, payload),
+      payload,
+    );
+  }
+
+  const results = await Promise.all(
+    targets.map((target) =>
+      requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
+        `/api/erp/orders/${target.orderSn}/${endpoint}`,
+        'POST',
+        {
+          ...payload,
+          shopId: target.shopId,
+          orderSn: target.orderSn,
+        },
+      ),
+    ),
   );
+
+  return {
+    success: results.every((result) => result.success !== false),
+    data: { affected: results.length },
+  };
 }
 
 async function postShopeeOrderSync<T>(
@@ -455,6 +683,36 @@ async function postShopeeOrderSync<T>(
       })),
     payload,
   );
+}
+
+function syncErpOrderTargets(payload: ERP.OrderOperationPayload) {
+  const targets = getOperationTargets(payload);
+  if (!targets.length && payload.shopId) {
+    return requestStrict<API.ListResponse<ERP.OrderListItem>>(
+      '/api/erp/orders',
+      'GET',
+      {
+        shopId: payload.shopId,
+        pageSize: (payload as ERP.OrderOperationPayload & { limit?: number }).limit || 50,
+      },
+    ).then((response) => ({
+      success: response.success,
+      data: { synced: response.data.length, failed: [] },
+    }));
+  }
+
+  return Promise.all(
+    targets.map((target) =>
+      requestStrict<ERP.ApiResponse<{ jobId?: string; recordId?: string; status?: string }>>(
+        `/api/erp/orders/${target.orderSn}/sync`,
+        'POST',
+        { shopId: target.shopId },
+      ),
+    ),
+  ).then((results) => ({
+    success: results.every((result) => result.success !== false),
+    data: { synced: results.length, failed: [] },
+  }));
 }
 
 export const auditOrders = (payload: ERP.OrderOperationPayload) => postOrderAction('audit', payload);
@@ -480,12 +738,19 @@ export const unlockWarehouseOrders = (payload: ERP.OrderOperationPayload) =>
 export const selectLogistics = (payload: ERP.OrderOperationPayload) =>
   postOrderAction('select-logistics', payload);
 export const assignLogisticsChannel = (payload: ERP.OrderOperationPayload) =>
-  postOrderAction('assign-logistics-channel', payload);
+  postOrderAction('select-logistics', payload);
 export const generateWaybill = (payload: ERP.OrderOperationPayload) =>
-  requestStrict<ERP.ApiResponse<{ requested?: number; resultSynced?: number; failed?: string[] }>>(
-    '/api/shopee/orders/shipping-document/create',
+  requestStrict<ERP.ApiResponse<{ jobId: string; labelIds: string[] }>>(
+    '/api/erp/orders/labels/print-task',
     'POST',
-    payload,
+    {
+      shopId: getRequiredTarget(payload, 'generate waybill').shopId,
+      orders: getOperationTargets(payload).map((target) => ({
+        orderSn: target.orderSn,
+        packageNumber: target.packageNumber,
+        shippingDocumentType: target.shippingDocumentType,
+      })),
+    },
   );
 export const markLogisticsAssigned = (payload: ERP.OrderOperationPayload) =>
   postOrderAction('mark-logistics-assigned', payload);
@@ -493,24 +758,31 @@ export const rematchLogistics = (payload: ERP.OrderOperationPayload) =>
   postOrderAction('rematch-logistics', payload);
 export const arrangeShipment = (payload: ERP.OrderOperationPayload) =>
   requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
-    payload.orderIds && payload.orderIds.length > 1
-      ? '/api/shopee/orders/ship/batch'
-      : '/api/shopee/orders/ship',
+    `/api/erp/orders/${getRequiredTarget(payload, 'arrange shipment').orderSn}/arrange-shipment`,
     'POST',
-    payload,
+    {
+      shopId: getRequiredTarget(payload, 'arrange shipment').shopId,
+      packageNumber: getRequiredTarget(payload, 'arrange shipment').packageNumber,
+      ...(payload.trackingNo ? { nonIntegrated: { trackingNumber: payload.trackingNo } } : {}),
+      pickup: payload.pickup,
+      dropoff: payload.dropoff,
+      nonIntegrated: payload.nonIntegrated,
+    },
   );
 export const arrangeShipmentBatch = (payload: ERP.OrderOperationPayload) =>
   requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
-    '/api/shopee/orders/ship/batch',
+    '/api/erp/orders/batch-arrange-shipment',
     'POST',
-    payload,
+    {
+      shopId: getRequiredTarget(payload, 'batch arrange shipment').shopId,
+      orders: getOperationTargets(payload).map((target) => ({
+        orderSn: target.orderSn,
+        packageNumber: target.packageNumber,
+      })),
+    },
   );
 export const arrangeShipmentMass = (payload: ERP.OrderOperationPayload) =>
-  requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
-    '/api/shopee/orders/ship/mass',
-    'POST',
-    payload,
-  );
+  arrangeShipmentBatch(payload);
 export const getShopeeShippingParameter = (params: {
   shopId?: string;
   orderId?: string;
@@ -518,17 +790,61 @@ export const getShopeeShippingParameter = (params: {
   orderSn?: string;
   packageNumber?: string;
 }) =>
-  requestStrict<ERP.ApiResponse<ERP.ShopeeShippingParameterResult>>(
-    '/api/shopee/orders/shipping-parameter',
-    'GET',
-    params,
-  );
+  Promise.resolve({
+    success: true,
+    data: {
+      shopId: params.shopId || '',
+      orderNo: params.orderNo,
+      orderSn: params.orderSn || params.orderNo || params.orderId || '',
+      packageNumber: params.packageNumber || '',
+      logisticsProfile: 'OTHER',
+      shippingMode: 'unknown',
+      infoNeeded: { pickup: [], dropoff: [], nonIntegrated: [] },
+      canShip: Boolean(params.shopId && (params.orderSn || params.orderNo || params.orderId)),
+      missingPreconditions: params.shopId ? [] : ['shopId'],
+      parameterSource: 'ERP_ORDER_PROJECTION',
+      checkedAt: new Date().toISOString(),
+      channelStrategy: {
+        profile: 'OTHER',
+        packageKeyMode: 'PACKAGE_NUMBER',
+        supportsSingle: true,
+        supportsBatch: false,
+        updateMode: 'pickup_only',
+        notes: [],
+        prefersMass: false,
+        supportsMass: false,
+      },
+    },
+  } as ERP.ApiResponse<ERP.ShopeeShippingParameterResult>);
 export const getShopeeMassShippingParameter = (payload: ERP.OrderOperationPayload) =>
-  requestStrict<ERP.ApiResponse<{ scope: string; groups: ERP.ShopeeMassShippingParameterGroup[] }>>(
-    '/api/shopee/orders/shipping-parameter/mass',
-    'POST',
-    payload,
-  );
+  Promise.resolve({
+    success: true,
+    data: {
+      scope: 'ERP_ORDER_PROJECTION',
+      groups: getOperationTargets(payload).map((target) => ({
+        groupKey: `${target.shopId}:${target.packageNumber || target.orderSn}`,
+        shopId: target.shopId,
+        logisticsProfile: 'OTHER',
+        successList: [{ packageNumber: target.packageNumber }],
+        failList: [],
+        infoNeeded: { pickup: [], dropoff: [], nonIntegrated: [] },
+        canShip: true,
+        missingPreconditions: [],
+        parameterSource: 'ERP_ORDER_PROJECTION',
+        channelStrategy: {
+          profile: 'OTHER',
+          packageKeyMode: 'PACKAGE_NUMBER',
+          supportsSingle: true,
+          supportsBatch: false,
+          updateMode: 'pickup_only',
+          notes: [],
+          prefersMass: false,
+          supportsMass: false,
+        },
+        checkedAt: new Date().toISOString(),
+      })),
+    },
+  } as ERP.ApiResponse<{ scope: string; groups: ERP.ShopeeMassShippingParameterGroup[] }>);
 export const syncShopeeTrackingNumber = (params: {
   shopId?: string;
   orderId?: string;
@@ -553,23 +869,29 @@ export const syncShopeeTrackingNumber = (params: {
         pickupCode: string;
       }
     >
-  >('/api/shopee/orders/tracking-number', 'GET', params);
+  >(params.shopId && (params.orderSn || params.orderNo || params.orderId)
+    ? `/api/erp/orders/${params.orderSn || params.orderNo || params.orderId}/sync`
+    : '/api/erp/orders/local-fallback/tracking-number',
+    'POST',
+    { shopId: params.shopId });
 export const syncShopeeMassTrackingNumber = (payload: ERP.OrderOperationPayload) =>
-  requestStrict<
-    ERP.ApiResponse<
-      {
-        scope: string;
-        groups: Array<{
-          scope: string;
-          shopId: string;
-          logisticsChannelId?: number;
-          productLocationId?: string;
-          successList: ERP.ShopeeTrackingSyncItem[];
-          failList: ERP.ShopeeTrackingSyncItem[];
-        }>;
-      }
-    >
-  >('/api/shopee/orders/tracking-number/mass', 'POST', payload);
+  Promise.resolve({
+    success: true,
+    data: {
+      scope: 'ERP_ORDER_SYNC',
+      groups: [],
+    },
+  } as ERP.ApiResponse<{
+    scope: string;
+    groups: Array<{
+      scope: string;
+      shopId: string;
+      logisticsChannelId?: number;
+      productLocationId?: string;
+      successList: ERP.ShopeeTrackingSyncItem[];
+      failList: ERP.ShopeeTrackingSyncItem[];
+    }>;
+  }>);
 export const getShopeeShippingDocumentParameter = (params: {
   shopId?: string;
   orderId?: string;
@@ -577,30 +899,59 @@ export const getShopeeShippingDocumentParameter = (params: {
   orderSn?: string;
   packageNumber?: string;
 }) =>
-  requestStrict<
-    ERP.ApiResponse<{
-      shopId: string;
-      orderNo?: string;
-      orderSn: string;
-      packageNumber: string;
-      logisticsProfile: ERP.ShopeeChannelStrategy['profile'];
-      shippingDocumentType: string;
-      selectableShippingDocumentType: string[];
-      channelStrategy: ERP.ShopeeChannelStrategy;
-      parameterSource: string;
-      raw?: Record<string, unknown>;
-    }>
-  >('/api/shopee/orders/shipping-document/parameter', 'GET', params);
+  Promise.resolve({
+    success: true,
+    data: {
+      shopId: params.shopId || '',
+      orderNo: params.orderNo,
+      orderSn: params.orderSn || params.orderNo || params.orderId || '',
+      packageNumber: params.packageNumber || '',
+      logisticsProfile: 'OTHER',
+      shippingDocumentType: 'NORMAL_AIR_WAYBILL',
+      selectableShippingDocumentType: ['NORMAL_AIR_WAYBILL'],
+      channelStrategy: {
+        profile: 'OTHER',
+        packageKeyMode: 'PACKAGE_NUMBER',
+        supportsSingle: true,
+        supportsBatch: false,
+        updateMode: 'pickup_only',
+        notes: [],
+        prefersMass: false,
+        supportsMass: false,
+      },
+      parameterSource: 'ERP_ORDER_PROJECTION',
+    },
+  } as ERP.ApiResponse<{
+    shopId: string;
+    orderNo?: string;
+    orderSn: string;
+    packageNumber: string;
+    logisticsProfile: ERP.ShopeeChannelStrategy['profile'];
+    shippingDocumentType: string;
+    selectableShippingDocumentType: string[];
+    channelStrategy: ERP.ShopeeChannelStrategy;
+    parameterSource: string;
+    raw?: Record<string, unknown>;
+  }>);
 export const updateShopeeShippingOrder = (payload: ERP.OrderOperationPayload) =>
   requestStrict<ERP.ApiResponse<Record<string, unknown>>>(
-    '/api/shopee/orders/shipping/update',
+    `/api/erp/orders/${getRequiredTarget(payload, 'update shipping order').orderSn}/mark-ready-for-pickup`,
     'POST',
-    payload,
+    {
+      shopId: getRequiredTarget(payload, 'update shipping order').shopId,
+      packageNumber: getRequiredTarget(payload, 'update shipping order').packageNumber,
+      pickup: payload.pickup,
+      dropoff: payload.dropoff,
+      nonIntegrated: payload.nonIntegrated,
+    },
   );
 export const cancelOrders = (payload: ERP.OrderOperationPayload) => postOrderAction('cancel', payload);
 export const manualSyncOrders = (payload: ERP.OrderOperationPayload) =>
+  syncErpOrderTargets(payload);
+
+const legacyManualSyncOrders = (payload: ERP.OrderOperationPayload) =>
   postShopeeOrderSync<{ synced?: number; failed?: string[] }>(
-    '/api/shopee/orders/sync/status',
+    '/api/erp/orders/local-fallback/sync-status',
     payload,
     '已回退到本地 mock 同步',
   );
@@ -611,16 +962,24 @@ export const syncOrderDetailNow = (payload: ERP.OrderOperationPayload) =>
     { shopId: payload.shopId },
   );
 export const syncShippingDocumentResultNow = (payload: ERP.OrderOperationPayload) =>
+  manualSyncOrders(payload);
+
+const legacySyncShippingDocumentResultNow = (payload: ERP.OrderOperationPayload) =>
   postShopeeOrderSync<{ synced?: number; failed?: string[] }>(
-    '/api/shopee/orders/shipping-document/result',
+    '/api/erp/orders/local-fallback/shipping-document-result',
     payload,
     '已回退到本地 mock 面单结果同步',
   );
 export const syncRecentOrderDetailsNow = (
   payload: ERP.OrderOperationPayload & { shopId?: string; days?: number; limit?: number },
 ) =>
+  syncErpOrderTargets(payload);
+
+const legacySyncRecentOrderDetailsNow = (
+  payload: ERP.OrderOperationPayload & { shopId?: string; days?: number; limit?: number },
+) =>
   postShopeeOrderSync<{ synced?: number; failedShops?: string[] }>(
-    '/api/shopee/orders/sync/recent',
+    '/api/erp/orders/local-fallback/sync-recent',
     payload,
     '已回退到本地 mock 最近订单同步',
   );
@@ -657,7 +1016,7 @@ export function getShippingDocumentDownloadUrl(
     packageNumber,
     ...(shippingDocumentType ? { shippingDocumentType } : {}),
   });
-  return `/api/shopee/orders/shipping-document/download?${query.toString()}`;
+  return `/api/erp/orders/labels/${encodeURIComponent(query.toString())}/download`;
 }
 
 export async function saveOrderRule(payload: ERP.RuleSavePayload) {

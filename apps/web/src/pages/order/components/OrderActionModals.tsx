@@ -118,6 +118,25 @@ function buildPayload(
 
   return {
     orderIds: ids,
+    orders: selectedOrders.length
+      ? selectedOrders
+          .filter((item) => item.platformShopId && item.orderSn)
+          .map((item) => ({
+            shopId: item.platformShopId,
+            orderSn: item.orderSn,
+            packageNumber: item.packageNumber,
+            shippingDocumentType: item.packageList?.[0]?.shippingDocumentType,
+          }))
+      : currentOrder?.platformShopId && currentOrder?.orderSn
+        ? [
+            {
+              shopId: currentOrder.platformShopId,
+              orderSn: currentOrder.orderSn,
+              packageNumber: currentOrder.packageNumber,
+              shippingDocumentType: currentOrder.packageList?.[0]?.shippingDocumentType,
+            },
+          ]
+        : [],
     orderId: currentOrder?.id,
     orderNo: currentOrder?.orderNo,
     orderSn: currentOrder?.orderSn,

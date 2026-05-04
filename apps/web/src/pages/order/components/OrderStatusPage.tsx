@@ -1,6 +1,7 @@
 import { Alert } from 'antd';
 import { PageContainer } from '@ant-design/pro-components';
-import React from 'react';
+import { useLocation } from '@umijs/max';
+import React, { useMemo } from 'react';
 import { queryOrders } from '@/services/erp/order';
 import {
   queryLiveOrders,
@@ -40,6 +41,12 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   shopId,
   live = true,
 }) => {
+  const location = useLocation();
+  const queryShopId = useMemo(
+    () => new URLSearchParams(location.search).get('shopId') || undefined,
+    [location.search],
+  );
+  const effectiveShopId = shopId || queryShopId;
   const overviewItemsMap: Record<string, Array<{ key: keyof ERP.OrderOverview; title: string }>> = {
     pending: [
       { key: 'pendingCount', title: '待处理总量' },
@@ -88,7 +95,7 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   const fulfillmentStage = TAB_TO_FULFILLMENT_STAGE[currentTab];
   const request = live
     ? (params: ERP.OrderQueryParams) =>
-        queryLiveOrders({ ...params, shopId, fulfillmentStage })
+        queryLiveOrders({ ...params, shopId: effectiveShopId, fulfillmentStage })
     : queryOrders;
 
   return (
@@ -96,7 +103,7 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
       {overviewItemsMap[currentTab]?.length ? (
         <OrderOverviewCards
           currentTab={currentTab}
-          shopId={shopId}
+          shopId={effectiveShopId}
           live={live}
           items={overviewItemsMap[currentTab]}
         />

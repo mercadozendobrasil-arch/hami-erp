@@ -351,7 +351,7 @@ const PackagePrecheckPage: React.FC = () => {
                 { title: '运单号', dataIndex: 'trackingNumber', renderText: (value) => value || '-' },
                 {
                   title: '订单详情',
-                  render: (_, record) => <Link to={`/order/detail/${record.orderId}`}>跳转订单详情</Link>,
+                  render: (_, record) => <Link to={`/order/detail/${record.orderId}?shopId=${record.shopId}`}>跳转订单详情</Link>,
                 },
               ]}
             />
@@ -535,7 +535,7 @@ const PackagePrecheckPage: React.FC = () => {
               >
                 下载面单
               </Button>
-              <Button href={`/order/detail/${drawerRow.orderId}`}>跳转订单详情</Button>
+              <Button href={`/order/detail/${drawerRow.orderId}?shopId=${drawerRow.shopId}`}>跳转订单详情</Button>
             </Space>
           </Space>
         ) : null}

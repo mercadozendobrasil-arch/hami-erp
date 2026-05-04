@@ -63,6 +63,10 @@ export class ShopeeSignature {
     return Math.floor(Date.now() / 1000);
   }
 
+  getPartnerId(): number {
+    return this.config.partnerId;
+  }
+
   private signRaw(payload: string): string {
     return createHmac('sha256', this.config.partnerKey)
       .update(payload, 'utf8')

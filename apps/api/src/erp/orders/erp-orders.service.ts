@@ -34,8 +34,7 @@ const STAGE_TO_SHOPEE_STATUS: Record<ErpFulfillmentStage, string> = {
   shipped: 'SHIPPED',
 };
 
-const DEFAULT_RESPONSE_FIELDS =
-  'order_status,package_list,buyer_username,total_amount,currency,create_time,update_time,shipping_carrier,checkout_shipping_carrier';
+const DEFAULT_RESPONSE_FIELDS = undefined;
 
 const ACTIVE_EXCEPTION_STATUSES = ['OPEN', 'RECHECKING', 'MANUAL_REVIEW'];
 

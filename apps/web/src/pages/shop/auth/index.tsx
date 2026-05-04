@@ -56,7 +56,8 @@ const ShopAuthPage: React.FC = () => {
 
   const handleAuthorize = async () => {
     try {
-      const response = await getShopeeAuthUrl();
+      const redirectUri = `${window.location.origin}/shop/auth/`;
+      const response = await getShopeeAuthUrl(redirectUri);
       window.location.href = response.url;
     } catch (error) {
       console.error(error);
@@ -137,10 +138,28 @@ const ShopAuthPage: React.FC = () => {
                 <Button block onClick={() => history.push('/shop/list')}>
                   打开店铺列表
                 </Button>
-                <Button block onClick={() => history.push('/product/list')}>
+                <Button
+                  block
+                  onClick={() =>
+                    history.push(
+                      authorizedShopId
+                        ? `/product/list?shopId=${authorizedShopId}`
+                        : '/product/list',
+                    )
+                  }
+                >
                   打开商品列表
                 </Button>
-                <Button block onClick={() => history.push('/order/all')}>
+                <Button
+                  block
+                  onClick={() =>
+                    history.push(
+                      authorizedShopId
+                        ? `/order/all?shopId=${authorizedShopId}`
+                        : '/order/all',
+                    )
+                  }
+                >
                   打开订单列表
                 </Button>
               </Space>

@@ -27,10 +27,11 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { formatBrazilCurrency } from '@/pages/order/utils/br';
 import {
   queryProducts,
+  syncRemoteProducts,
   syncProduct,
   unlistProduct,
 } from '@/services/erp/product';
@@ -139,7 +140,27 @@ const ProductListPage: React.FC = () => {
     [shopsResponse?.data],
   );
 
+  useEffect(() => {
+    const firstShopId = shopOptions[0]?.value;
+    if (!shopId && firstShopId) {
+      setShopId(firstShopId);
+      history.replace(`/product/list?shopId=${firstShopId}`);
+    }
+  }, [shopId, shopOptions]);
+
   const unavailable = () => messageApi.info('暂未接入');
+
+  const syncRemote = async () => {
+    if (!shopId) return;
+    try {
+      const response = await syncRemoteProducts(shopId);
+      const synced = Number(response.data?.synced ?? 0);
+      messageApi.success(`已同步 ${synced} 个商品`);
+      actionRef.current?.reload();
+    } catch {
+      messageApi.error('同步失败');
+    }
+  };
 
   const syncOne = async (record: ProductRecord) => {
     try {
@@ -315,7 +336,7 @@ const ProductListPage: React.FC = () => {
     },
   ];
 
-  if (!shopId) {
+  if (!shopId && !shopOptions.length) {
     return (
       <div className="erp-product-page">
         {contextHolder}
@@ -393,7 +414,7 @@ const ProductListPage: React.FC = () => {
           <div className="erp-toolbar-spacer" />
           <Button
             icon={<SyncOutlined />}
-            onClick={() => actionRef.current?.reload()}
+            onClick={syncRemote}
           >
             同步
           </Button>

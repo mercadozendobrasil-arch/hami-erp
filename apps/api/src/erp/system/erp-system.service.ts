@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from 'src/infra/database/prisma.service';
+import { PrismaService } from '../../infra/database/prisma.service';
 
+import { ErpAuthService } from '../auth/erp-auth.service';
 import {
   ErpAuditLogQueryDto,
   ErpSystemPageQueryDto,
@@ -28,7 +29,10 @@ const ERP_PERMISSIONS = [
 
 @Injectable()
 export class ErpSystemService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly erpAuthService: ErpAuthService,
+  ) {}
 
   listPermissions() {
     return {
@@ -169,11 +173,21 @@ export class ErpSystemService {
         displayName: payload.displayName,
         email: payload.email,
         active: payload.active ?? true,
+        ...(payload.password
+          ? {
+              passwordHash: this.erpAuthService.hashPassword(payload.password),
+              passwordChangedAt: new Date(),
+            }
+          : {}),
       },
       create: {
         username: payload.username,
         displayName: payload.displayName,
         email: payload.email,
+        passwordHash: payload.password
+          ? this.erpAuthService.hashPassword(payload.password)
+          : undefined,
+        passwordChangedAt: payload.password ? new Date() : undefined,
         active: payload.active ?? true,
       },
     });
@@ -197,7 +211,7 @@ export class ErpSystemService {
       status: 'SUCCESS',
       resourceId: user.id,
       message: `Saved user ${user.username}`,
-      request: payload,
+      request: this.toSafeUserAuditRequest(payload),
     });
 
     return { success: true, data: user };
@@ -361,5 +375,13 @@ export class ErpSystemService {
 
   private toJson(input: unknown): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(input)) as Prisma.InputJsonValue;
+  }
+
+  private toSafeUserAuditRequest(payload: SaveErpUserDto) {
+    const { password: _password, ...safePayload } = payload;
+    return {
+      ...safePayload,
+      passwordChanged: Boolean(payload.password),
+    };
   }
 }

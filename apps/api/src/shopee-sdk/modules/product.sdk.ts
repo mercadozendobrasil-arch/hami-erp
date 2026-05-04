@@ -33,6 +33,10 @@ export interface ShopeeItemSummary {
   update_time?: number;
 }
 
+export interface ShopeeItemListQuery extends ShopeePaginationQuery {
+  itemStatus?: string;
+}
+
 export interface ShopeeItemModelPayload {
   modelId?: number;
   modelSku?: string;
@@ -159,7 +163,7 @@ export class ProductSdk {
 
   getItemList(
     context: ShopeeBusinessContext,
-    query: ShopeePaginationQuery = {},
+    query: ShopeeItemListQuery = {},
   ) {
     return this.requestData<{ item: ShopeeItemSummary[] }>({
       method: 'GET',
@@ -169,6 +173,7 @@ export class ProductSdk {
       query: {
         offset: query.offset ?? 0,
         page_size: query.pageSize ?? 50,
+        item_status: query.itemStatus,
       },
     });
   }

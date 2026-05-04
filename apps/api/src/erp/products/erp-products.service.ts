@@ -6,18 +6,28 @@ import {
   Prisma,
 } from '@prisma/client';
 
+import { ShopeeTokenService } from 'src/common/shopee-token.service';
 import { PrismaService } from 'src/infra/database/prisma.service';
+import { ProductSdk } from 'src/shopee-sdk/modules/product.sdk';
 
 import { BindErpSkuMappingDto, CreateErpProductDto } from './dto/erp-product.dto';
 import { ErpProductQueryDto, ErpSkuQueryDto } from './dto/erp-product-query.dto';
 
 @Injectable()
 export class ErpProductsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly shopeeTokenService: ShopeeTokenService,
+    private readonly productSdk: ProductSdk,
+  ) {}
 
   async listProducts(query: ErpProductQueryDto) {
     const current = query.current ?? 1;
     const pageSize = query.pageSize ?? 20;
+    if (query.shopId) {
+      await this.ensureRemoteProductsImported(query.shopId);
+    }
+
     const where: Prisma.ErpProductWhereInput = {
       ...(query.title ? { title: { contains: query.title, mode: 'insensitive' } } : {}),
       ...(this.isProductStatus(query.status)
@@ -52,6 +62,18 @@ export class ErpProductsService {
       total,
       current,
       pageSize,
+    };
+  }
+
+  async syncRemoteProducts(shopIdRaw: string) {
+    const synced = await this.importRemoteProducts(shopIdRaw, true);
+
+    return {
+      success: true,
+      data: {
+        shopId: shopIdRaw,
+        synced,
+      },
     };
   }
 
@@ -527,6 +549,269 @@ export class ErpProductsService {
       createTime: product.createdAt.toISOString(),
       lastSyncTime: firstBinding?.lastSyncedAt?.toISOString(),
     };
+  }
+
+  private async ensureRemoteProductsImported(shopId: string) {
+    const existing = await this.prismaService.erpPlatformProduct.count({
+      where: {
+        platform: 'SHOPEE',
+        shopId,
+      },
+    });
+
+    if (existing === 0) {
+      await this.importRemoteProducts(shopId, false);
+    }
+  }
+
+  private async importRemoteProducts(shopIdRaw: string, throwOnFailure: boolean) {
+    const shopId = BigInt(shopIdRaw);
+    const { token } =
+      await this.shopeeTokenService.findRequiredTokenByShopId(shopId);
+    const context = {
+      shopId: Number(shopId),
+      accessToken: token.accessToken,
+    };
+    let list: { item?: unknown };
+    try {
+      list = await this.productSdk.getItemList(context, {
+        offset: 0,
+        pageSize: 50,
+        itemStatus: 'NORMAL',
+      });
+    } catch (error) {
+      if (throwOnFailure) throw error;
+      return 0;
+    }
+    const summaries = this.arrayRecords((list as Record<string, unknown>).item);
+    const itemIds = summaries
+      .map((item) => this.optionalNumber(item.item_id ?? item.itemId))
+      .filter((itemId): itemId is number => itemId !== undefined);
+
+    if (itemIds.length === 0) return 0;
+
+    const baseInfo = await this.productSdk.getItemBaseInfo(context, itemIds);
+    const baseItems = this.arrayRecords(
+      (baseInfo as Record<string, unknown>).item_list,
+    );
+    const baseByItemId = new Map(
+      baseItems
+        .map((item) => [
+          this.optionalString(item.item_id ?? item.itemId),
+          item,
+        ] as const)
+        .filter(([itemId]) => Boolean(itemId)),
+    );
+
+    let synced = 0;
+    for (const summary of summaries) {
+      const itemId = this.optionalString(summary.item_id ?? summary.itemId);
+      if (!itemId) continue;
+
+      const base = baseByItemId.get(itemId) ?? summary;
+      await this.upsertRemoteProduct(shopIdRaw, itemId, {
+        ...summary,
+        ...base,
+      });
+      synced += 1;
+    }
+
+    return synced;
+  }
+
+  private async upsertRemoteProduct(
+    shopId: string,
+    itemId: string,
+    remote: Record<string, unknown>,
+  ) {
+    const title =
+      this.optionalString(remote.item_name ?? remote.itemName ?? remote.name) ??
+      `Shopee Item ${itemId}`;
+    const skuCode =
+      this.optionalString(remote.item_sku ?? remote.itemSku ?? remote.sku) ??
+      `SHOPEE-${shopId}-${itemId}`;
+    const price = this.extractPrice(remote);
+    const stock = this.extractStock(remote);
+    const imageUrl = this.extractImageUrl(remote);
+    const status = this.toLocalProductStatus(
+      this.optionalString(remote.item_status ?? remote.itemStatus),
+    );
+    const publishStatus = this.toPlatformPublishStatus(
+      this.optionalString(remote.item_status ?? remote.itemStatus),
+    );
+    const raw = this.toJson(remote);
+    const existing = await this.prismaService.erpPlatformProduct.findUnique({
+      where: {
+        platform_shopId_itemId: {
+          platform: 'SHOPEE',
+          shopId,
+          itemId,
+        },
+      },
+      include: {
+        product: {
+          include: {
+            skus: true,
+          },
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prismaService.erpProduct.update({
+        where: { id: existing.productId },
+        data: {
+          title,
+          parentSku: skuCode,
+          price: price === undefined ? undefined : new Prisma.Decimal(String(price)),
+          defaultImageUrl: imageUrl,
+          status,
+          raw,
+          skus: existing.product.skus[0]
+            ? {
+                update: {
+                  where: { id: existing.product.skus[0].id },
+                  data: {
+                    skuCode,
+                    price:
+                      price === undefined
+                        ? undefined
+                        : new Prisma.Decimal(String(price)),
+                    stock,
+                    status: status === ErpProductStatus.ACTIVE ? 'ACTIVE' : 'INACTIVE',
+                    attributes: raw,
+                  },
+                },
+              }
+            : {
+                create: {
+                  skuCode,
+                  price:
+                    price === undefined
+                      ? undefined
+                      : new Prisma.Decimal(String(price)),
+                  stock,
+                  status: status === ErpProductStatus.ACTIVE ? 'ACTIVE' : 'INACTIVE',
+                  attributes: raw,
+                },
+              },
+          platformProducts: {
+            update: {
+              where: { id: existing.id },
+              data: {
+                title,
+                publishStatus,
+                raw,
+                lastSyncedAt: new Date(),
+              },
+            },
+          },
+        },
+      });
+      return;
+    }
+
+    await this.prismaService.erpProduct.create({
+      data: {
+        title,
+        parentSku: skuCode,
+        price: price === undefined ? undefined : new Prisma.Decimal(String(price)),
+        defaultImageUrl: imageUrl,
+        status,
+        raw,
+        skus: {
+          create: {
+            skuCode,
+            price: price === undefined ? undefined : new Prisma.Decimal(String(price)),
+            stock,
+            status: status === ErpProductStatus.ACTIVE ? 'ACTIVE' : 'INACTIVE',
+            attributes: raw,
+          },
+        },
+        platformProducts: {
+          create: {
+            platform: 'SHOPEE',
+            shopId,
+            itemId,
+            title,
+            publishStatus,
+            raw,
+            lastSyncedAt: new Date(),
+          },
+        },
+      },
+    });
+  }
+
+  private toLocalProductStatus(itemStatus?: string): ErpProductStatus {
+    if (!itemStatus) return ErpProductStatus.ACTIVE;
+    return ['DELETED', 'BANNED', 'UNLIST'].includes(itemStatus)
+      ? ErpProductStatus.INACTIVE
+      : ErpProductStatus.ACTIVE;
+  }
+
+  private toPlatformPublishStatus(itemStatus?: string): ErpPlatformPublishStatus {
+    if (!itemStatus) return ErpPlatformPublishStatus.ACTIVE;
+    if (['DELETED', 'BANNED', 'UNLIST'].includes(itemStatus)) {
+      return ErpPlatformPublishStatus.INACTIVE;
+    }
+    return ErpPlatformPublishStatus.ACTIVE;
+  }
+
+  private extractPrice(remote: Record<string, unknown>) {
+    const direct = this.optionalNumber(
+      remote.price ??
+        remote.original_price ??
+        remote.originalPrice ??
+        remote.current_price ??
+        remote.currentPrice,
+    );
+    if (direct !== undefined) return direct;
+
+    const priceInfo = this.arrayRecords(remote.price_info ?? remote.priceInfo)[0];
+    return this.optionalNumber(
+      priceInfo?.current_price ??
+        priceInfo?.currentPrice ??
+        priceInfo?.original_price ??
+        priceInfo?.originalPrice,
+    );
+  }
+
+  private extractStock(remote: Record<string, unknown>) {
+    const direct = this.optionalNumber(remote.stock ?? remote.normal_stock);
+    if (direct !== undefined) return direct;
+
+    const stockInfo = this.asRecord(remote.stock_info_v2 ?? remote.stockInfoV2);
+    const summary = this.asRecord(stockInfo.summary_info ?? stockInfo.summaryInfo);
+    const summaryStock = this.optionalNumber(
+      summary.total_available_stock ?? summary.totalAvailableStock,
+    );
+    if (summaryStock !== undefined) return summaryStock;
+
+    const sellerStock = this.arrayRecords(stockInfo.seller_stock ?? stockInfo.sellerStock)[0];
+    return (
+      this.optionalNumber(sellerStock?.stock ?? sellerStock?.seller_stock) ?? 0
+    );
+  }
+
+  private extractImageUrl(remote: Record<string, unknown>) {
+    const image = this.asRecord(remote.image);
+    const imageUrlList = [
+      ...this.arrayRecords(image.image_url_list ?? image.imageUrlList),
+      ...this.arrayRecords(remote.image_url_list ?? remote.imageUrlList),
+    ];
+    const firstRecordUrl = imageUrlList
+      .map((item) => this.optionalString(item.image_url ?? item.imageUrl ?? item.url))
+      .find(Boolean);
+    if (firstRecordUrl) return firstRecordUrl;
+
+    const stringList = [
+      ...(Array.isArray(image.image_url_list) ? image.image_url_list : []),
+      ...(Array.isArray(remote.image_url_list) ? remote.image_url_list : []),
+    ];
+    return stringList
+      .map((item) => this.optionalString(item))
+      .find(Boolean);
   }
 
   private collectOrderSkuCandidates(

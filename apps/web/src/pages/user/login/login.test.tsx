@@ -1,92 +1,66 @@
-﻿// @ts-ignore
-import { startMock } from '@@/requestRecordMock';
-import { TestBrowser } from '@@/testBrowser';
-import { fireEvent, render } from '@testing-library/react';
-import React, { act } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
 
-let server: {
-  close: () => void;
-};
+import { login } from '@/services/ant-design-pro/api';
+import Login from './index';
+
+jest.mock('@umijs/max', () => {
+  const react = require('react');
+  return {
+    Helmet: ({ children }: any) => react.createElement(react.Fragment, null, children),
+    useModel: () => ({
+      initialState: {
+        fetchUserInfo: jest.fn().mockResolvedValue({
+          id: 'admin',
+          name: 'Admin',
+          access: 'admin',
+        }),
+      },
+      setInitialState: jest.fn(),
+    }),
+  };
+});
+
+jest.mock('@/services/ant-design-pro/api', () => ({
+  login: jest.fn(),
+}));
 
 describe('Login Page', () => {
-  beforeAll(async () => {
-    server = await startMock({
-      port: 8000,
-      scene: 'login',
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (login as jest.Mock).mockResolvedValue({
+      status: 'error',
     });
-  });
-
-  afterAll(() => {
-    server?.close();
   });
 
   it('should show login form', async () => {
-    const historyRef = React.createRef<any>();
-    const rootContainer = render(
-      <TestBrowser
-        historyRef={historyRef}
-        location={{
-          pathname: '/user/login',
-        }}
-      />,
-    );
+    render(React.createElement(Login));
 
-    await rootContainer.findAllByText('Ant Design');
-
-    act(() => {
-      historyRef.current?.push('/user/login');
-    });
-
-    expect(
-      rootContainer.baseElement?.querySelector('.ant-pro-form-login-desc')
-        ?.textContent,
-    ).toBe(
-      'Ant Design is the most influential web design specification in Xihu district',
-    );
-
-    expect(rootContainer.asFragment()).toMatchSnapshot();
-
-    rootContainer.unmount();
+    expect(await screen.findByText('Hami ERP')).toBeTruthy();
+    expect(screen.getByText('公司内部系统')).toBeTruthy();
+    expect(screen.getByPlaceholderText('用户名')).toBeTruthy();
+    expect(screen.getByPlaceholderText('密码')).toBeTruthy();
   });
 
-  it('should login success', async () => {
-    const historyRef = React.createRef<any>();
-    const rootContainer = render(
-      <TestBrowser
-        historyRef={historyRef}
-        location={{
-          pathname: '/user/login',
-        }}
-      />,
-    );
+  it('should submit credentials', async () => {
+    render(React.createElement(Login));
 
-    await rootContainer.findAllByText('Ant Design');
-
-    const userNameInput = await rootContainer.findByPlaceholderText(
-      'Username: admin or user',
-    );
-
-    act(() => {
-      fireEvent.change(userNameInput, { target: { value: 'admin' } });
+    fireEvent.change(await screen.findByPlaceholderText('用户名'), {
+      target: { value: 'admin' },
     });
+    fireEvent.change(screen.getByPlaceholderText('密码'), {
+      target: { value: 'secret' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /登\s*录/ }));
 
-    const passwordInput = await rootContainer.findByPlaceholderText(
-      'Password: ant.design',
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledWith(
+        expect.objectContaining({
+          username: 'admin',
+          password: 'secret',
+          autoLogin: true,
+        }),
+      ),
     );
-
-    act(() => {
-      fireEvent.change(passwordInput, { target: { value: 'ant.design' } });
-    });
-
-    await (await rootContainer.findByText('Login')).click();
-
-    // Wait for login to succeed and navigate to home page
-    await rootContainer.findByText('Ant Design Pro', undefined, {
-      timeout: 10000,
-    });
-
-    expect(rootContainer.asFragment()).toMatchSnapshot();
-
-    rootContainer.unmount();
   });
 });

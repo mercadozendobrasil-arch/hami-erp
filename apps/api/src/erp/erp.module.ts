@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 
 import { FocusNfeModule } from '../fiscal/focus-nfe/focus-nfe.module';
 import { NuvemFiscalModule } from '../fiscal/nuvem-fiscal/nuvem-fiscal.module';
 
+import { ErpAuthController } from './auth/erp-auth.controller';
+import { ErpAuthGuard } from './auth/erp-auth.guard';
+import { ErpAuthService } from './auth/erp-auth.service';
 import { ErpDashboardController } from './dashboard/erp-dashboard.controller';
 import { ErpDashboardService } from './dashboard/erp-dashboard.service';
 import { ErpFinanceController } from './finance/erp-finance.controller';
@@ -29,6 +33,7 @@ import { ErpSystemService } from './system/erp-system.service';
 @Module({
   imports: [FocusNfeModule, NuvemFiscalModule],
   controllers: [
+    ErpAuthController,
     ErpDashboardController,
     ErpJobsController,
     ErpOrderActionsController,
@@ -42,6 +47,11 @@ import { ErpSystemService } from './system/erp-system.service';
     ErpSystemController,
   ],
   providers: [
+    ErpAuthService,
+    {
+      provide: APP_GUARD,
+      useClass: ErpAuthGuard,
+    },
     ErpDashboardService,
     ErpJobsService,
     ErpOrderActionsService,

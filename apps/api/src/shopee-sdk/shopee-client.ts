@@ -31,6 +31,7 @@ export class ShopeeClient {
       shopId: request.shopId,
       timestamp: request.timestamp,
       body: {
+        partner_id: this.shopeeSignature.getPartnerId(),
         code: request.code,
         shop_id: Number(request.shopId),
       },
@@ -46,6 +47,7 @@ export class ShopeeClient {
       shopId: request.shopId,
       timestamp: request.timestamp,
       body: {
+        partner_id: this.shopeeSignature.getPartnerId(),
         refresh_token: request.refreshToken,
         shop_id: Number(request.shopId),
       },

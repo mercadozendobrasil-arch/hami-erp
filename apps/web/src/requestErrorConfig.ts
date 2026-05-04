@@ -12,7 +12,7 @@ enum ErrorShowType {
 }
 // 与后端约定的响应数据格式
 interface ResponseStructure {
-  success: boolean;
+  success?: boolean;
   data: unknown;
   errorCode?: number;
   errorMessage?: string;
@@ -31,7 +31,7 @@ export const errorConfig: RequestConfig = {
     errorThrower: (res) => {
       const { success, data, errorCode, errorMessage, showType } =
         res as unknown as ResponseStructure;
-      if (!success) {
+      if (success === false) {
         const error: any = new Error(errorMessage);
         error.name = 'BizError';
         error.info = { errorCode, errorMessage, showType, data };
@@ -70,6 +70,13 @@ export const errorConfig: RequestConfig = {
           }
         }
       } else if (error.response) {
+        if (error.response.status === 401 && window.location.pathname !== '/user/login') {
+          const searchParams = new URLSearchParams({
+            redirect: window.location.pathname + window.location.search,
+          });
+          window.location.href = `/user/login?${searchParams.toString()}`;
+          return;
+        }
         // Axios 的错误
         // 请求成功发出且服务器也响应了状态码，但状态代码超出了 2xx 的范围
         message.error(`Response status:${error.response.status}`);
@@ -88,9 +95,7 @@ export const errorConfig: RequestConfig = {
   // 请求拦截器
   requestInterceptors: [
     (config: RequestOptions) => {
-      // 拦截请求配置，进行个性化处理。
-      const url = config?.url?.concat('?token=123');
-      return { ...config, url };
+      return config;
     },
   ],
 

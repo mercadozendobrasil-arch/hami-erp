@@ -2,7 +2,7 @@ import { LinkOutlined } from '@ant-design/icons';
 import type { Settings as LayoutSettings } from '@ant-design/pro-components';
 import { SettingDrawer } from '@ant-design/pro-components';
 import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max';
-import { Link } from '@umijs/max';
+import { history, Link } from '@umijs/max';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import React from 'react';
@@ -15,6 +15,7 @@ import {
 } from '@/components';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
+import { currentUser } from '@/services/ant-design-pro/api';
 
 dayjs.extend(relativeTime);
 
@@ -27,9 +28,30 @@ export async function getInitialState(): Promise<{
   loading?: boolean;
   fetchUserInfo?: () => Promise<API.CurrentUser | undefined>;
 }> {
-  return {
-    fetchUserInfo: async () => undefined,
+  const fetchUserInfo = async () => {
+    try {
+      const response = await currentUser({ skipErrorHandler: true });
+      return response.data;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const state = {
+    fetchUserInfo,
     settings: defaultSettings as Partial<LayoutSettings>,
+  };
+
+  if (history.location.pathname !== '/user/login') {
+    const user = await fetchUserInfo();
+    return {
+      ...state,
+      currentUser: user,
+    };
+  }
+
+  return {
+    ...state,
   };
 }
 
@@ -62,7 +84,17 @@ export const layout: RunTimeLayoutConfig = ({
         }
       : undefined,
     footerRender: () => <Footer />,
-    onPageChange: () => undefined,
+    onPageChange: () => {
+      const { location } = history;
+      if (!initialState?.currentUser && location.pathname !== '/user/login') {
+        history.replace({
+          pathname: '/user/login',
+          search: new URLSearchParams({
+            redirect: location.pathname + location.search,
+          }).toString(),
+        });
+      }
+    },
     bgLayoutImgList: [
       {
         src: 'https://mdn.alipayobjects.com/yuyan_qk0oxh/afts/img/D2LWSqNny4sAAAAAAAAAAAAAFl94AQBr',

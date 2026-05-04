@@ -1282,6 +1282,8 @@ declare namespace ERP {
     orders?: Array<{
       shopId: string;
       orderSn: string;
+      packageNumber?: string;
+      shippingDocumentType?: string;
     }>;
     orderId?: string;
     orderNo?: string;
