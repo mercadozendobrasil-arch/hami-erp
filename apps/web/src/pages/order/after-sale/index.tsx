@@ -3,6 +3,7 @@ import { PageContainer, ProDescriptions, ProTable } from '@ant-design/pro-compon
 import { Alert, Drawer, Tag, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import React, { useState } from 'react';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import { getActionBinding } from '@/services/erp/orderPlatform';
 import { queryAfterSales } from '@/services/erp/order';
 import {
@@ -13,6 +14,7 @@ import {
 
 const AfterSalePage: React.FC = () => {
   const [drawerRow, setDrawerRow] = useState<ERP.AfterSaleItem>();
+  const { shopId } = useResolvedShopId();
   const columns: ProColumns<ERP.AfterSaleItem>[] = [
     {
       title: '售后单号',
@@ -128,7 +130,7 @@ const AfterSalePage: React.FC = () => {
       <ProTable<ERP.AfterSaleItem, ERP.OrderQueryParams>
         rowKey="id"
         columns={columns}
-        request={queryAfterSales}
+        request={(params) => queryAfterSales({ ...params, ...(shopId ? { shopId } : {}) })}
         search={{ labelWidth: 92, defaultCollapsed: false }}
         pagination={{ pageSize: 10 }}
         headerTitle="售后订单"

@@ -3,6 +3,7 @@ import { PageContainer, ProDescriptions, ProTable } from '@ant-design/pro-compon
 import { Drawer, Space, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import React, { useState } from 'react';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import { queryShopeeSyncLogs } from '@/services/erp/order';
 
 const TRIGGER_OPTIONS: Record<ERP.ShopeeSyncLogItem['triggerType'], { text: string; color: string }> = {
@@ -29,6 +30,7 @@ const RESULT_OPTIONS: Record<ERP.ShopeeSyncLogItem['resultStatus'], { text: stri
 
 const SyncLogsPage: React.FC = () => {
   const [drawerRow, setDrawerRow] = useState<ERP.ShopeeSyncLogItem>();
+  const { shopId } = useResolvedShopId();
 
   const columns: ProColumns<ERP.ShopeeSyncLogItem>[] = [
     {
@@ -145,7 +147,11 @@ const SyncLogsPage: React.FC = () => {
       <ProTable<ERP.ShopeeSyncLogItem, ERP.ShopeeSyncLogQueryParams>
         rowKey="logId"
         columns={columns}
-        request={queryShopeeSyncLogs}
+        request={(params) =>
+          shopId
+            ? queryShopeeSyncLogs({ ...params, shopId })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         search={{ labelWidth: 110 }}
         pagination={{ pageSize: 10 }}
         headerTitle="Shopee 同步日志"

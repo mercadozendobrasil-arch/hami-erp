@@ -8,6 +8,7 @@ import { PageContainer, ProTable } from '@ant-design/pro-components';
 import { Button, Drawer, Modal, Progress, Space, message } from 'antd';
 import React, { useRef, useState } from 'react';
 import OrderOverviewCards from '../components/OrderOverviewCards';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import {
   ORDER_STATUS_OPTIONS,
   WAREHOUSE_OPTIONS,
@@ -30,6 +31,7 @@ const WarehouseAllocationPage: React.FC = () => {
   const [drawerRow, setDrawerRow] = useState<ERP.OrderListItem>();
   const [reassignMode, setReassignMode] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const { shopId } = useResolvedShopId();
 
   const reload = () => actionRef.current?.reloadAndRest?.();
 
@@ -137,6 +139,7 @@ const WarehouseAllocationPage: React.FC = () => {
     <PageContainer title="仓库分配" subTitle="内部仓配能力继续保留，但以 Shopee 主状态作为上下文，不再替代 Shopee 订单状态。">
       <OrderOverviewCards
         currentTab="pendingShipment"
+        shopId={shopId}
         items={[
           { key: 'total', title: '待仓配订单' },
           { key: 'readyToShipCount', title: '待出货' },
@@ -149,7 +152,11 @@ const WarehouseAllocationPage: React.FC = () => {
         rowKey="id"
         actionRef={actionRef}
         columns={columns}
-        request={(params) => queryWarehouseOrders({ ...params, currentTab: 'pendingShipment' })}
+        request={(params) =>
+          shopId
+            ? queryWarehouseOrders({ ...params, shopId, currentTab: 'pendingShipment' })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         search={{ labelWidth: 92 }}
         pagination={{ pageSize: 10 }}
         rowSelection={{ onChange: (_, rows) => setSelectedRows(rows) }}

@@ -6,7 +6,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from '@umijs/max';
+import { history, useLocation } from '@umijs/max';
 import {
   Alert,
   Button,
@@ -19,7 +19,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   bindSkuMapping,
   queryErpSkus,
@@ -53,9 +53,10 @@ const MappingPage: React.FC = () => {
   });
 
   const { data: skusResponse, isFetching: loadingSkus } = useQuery({
-    queryKey: ['erp-skus', skuKeyword],
+    queryKey: ['erp-skus', shopId, skuKeyword],
     queryFn: () =>
-      queryErpSkus({ current: 1, pageSize: 50, keyword: skuKeyword }),
+      queryErpSkus({ current: 1, pageSize: 50, shopId, keyword: skuKeyword }),
+    enabled: Boolean(shopId),
   });
 
   const shopOptions = useMemo(
@@ -76,6 +77,18 @@ const MappingPage: React.FC = () => {
       })),
     [skusResponse?.data],
   );
+
+  useEffect(() => {
+    const firstShopId = shopOptions[0]?.value;
+    if (shopId || !firstShopId) {
+      return;
+    }
+
+    setShopId(firstShopId);
+    const search = new URLSearchParams(location.search);
+    search.set('shopId', firstShopId);
+    history.replace(`${location.pathname}?${search.toString()}`);
+  }, [location.pathname, location.search, shopId, shopOptions]);
 
   const submitBinding = async () => {
     if (!bindingRecord || !selectedSkuId) {
@@ -206,6 +219,13 @@ const MappingPage: React.FC = () => {
             style={{ width: 220 }}
             onChange={(value) => {
               setShopId(value);
+              const search = new URLSearchParams(location.search);
+              if (value) {
+                search.set('shopId', value);
+              } else {
+                search.delete('shopId');
+              }
+              history.replace(`${location.pathname}?${search.toString()}`);
               actionRef.current?.reload();
             }}
           />

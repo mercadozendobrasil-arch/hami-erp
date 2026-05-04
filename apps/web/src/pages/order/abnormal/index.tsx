@@ -6,6 +6,7 @@ import { Alert, Button, Modal, Space, Tag, Typography, message } from 'antd';
 import React, { useRef, useState } from 'react';
 import OrderActionModals from '../components/OrderActionModals';
 import RuleDetailDrawer from '../components/RuleDetailDrawer';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import {
   ABNORMAL_CURRENT_STATUS_OPTIONS,
   ABNORMAL_CURRENT_STATUS_VALUE_ENUM,
@@ -35,6 +36,7 @@ const AbnormalOrderPage: React.FC = () => {
   const formRef = useRef<ProFormInstance<ERP.OrderQueryParams> | undefined>(undefined);
   const [selectedRows, setSelectedRows] = useState<ERP.OrderListItem[]>([]);
   const [detailRuleId, setDetailRuleId] = useState<string | undefined>(undefined);
+  const { shopId } = useResolvedShopId();
 
   const { data: ruleResponse } = useQuery({
     queryKey: ['order-rules-all'],
@@ -231,7 +233,11 @@ const AbnormalOrderPage: React.FC = () => {
         actionRef={actionRef}
         formRef={formRef}
         columns={columns}
-        request={queryAbnormalOrders}
+        request={(params) =>
+          shopId
+            ? queryAbnormalOrders({ ...params, shopId })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         headerTitle="异常订单池"
         search={{ labelWidth: 100, defaultCollapsed: false }}
         pagination={{ pageSize: 10 }}

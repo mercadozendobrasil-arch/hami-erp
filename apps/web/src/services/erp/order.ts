@@ -41,6 +41,7 @@ async function requestWithFallback<T>(
   method: 'GET' | 'POST',
   fallback: () => Promise<T> | T,
   params?: Record<string, unknown>,
+  allowFallback = allowOrderMockFallback,
 ) {
   try {
     if (method === 'GET') {
@@ -48,7 +49,7 @@ async function requestWithFallback<T>(
     }
     return await request<T>(url, { method, data: params });
   } catch (error) {
-    if (!allowOrderMockFallback) {
+    if (!allowFallback) {
       throw error;
     }
 
@@ -325,10 +326,11 @@ export async function queryPackagePrecheck(params: ERP.PackagePrecheckQueryParam
 
 export async function queryWarehouseOrders(params: ERP.OrderQueryParams) {
   const response = await requestWithFallback<API.ListResponse<ERP.OrderListItem>>(
-    '/api/warehouse-orders',
+    '/api/erp/orders',
     'GET',
     () => mockQueryWarehouseOrders(params),
-    params,
+    { ...params, currentTab: params.currentTab || 'pendingShipment' },
+    true,
   );
   return normalizeOrderListResponse(response);
 }
@@ -366,6 +368,7 @@ export async function queryAfterSales(params: ERP.OrderQueryParams) {
     'GET',
     () => mockQueryAfterSales(params),
     params,
+    true,
   );
   return normalizeListResponse({
     ...response,
@@ -494,6 +497,7 @@ export async function queryOrderLogs(params: ERP.OrderLogQueryParams) {
     'GET',
     () => mockQueryLogs(params),
     params,
+    true,
   );
   return normalizeListResponse(response);
 }
@@ -513,6 +517,7 @@ export async function queryOrderRules(params: ERP.RuleQueryParams) {
     'GET',
     () => mockQueryRules(params),
     params,
+    true,
   );
   return normalizeListResponse(response);
 }
@@ -522,6 +527,8 @@ export async function getOrderRuleDetail(id: string) {
     `/api/rules/${id}`,
     'GET',
     () => ({ success: true, data: mockGetRuleDetail(id) }),
+    undefined,
+    true,
   );
   return response.data;
 }
@@ -1025,6 +1032,7 @@ export async function saveOrderRule(payload: ERP.RuleSavePayload) {
     'POST',
     () => saveRule(payload),
     payload,
+    true,
   );
   return response.data;
 }
@@ -1035,6 +1043,7 @@ export async function toggleOrderRule(id: string) {
     'POST',
     () => toggleRule(id),
     { id },
+    true,
   );
   return response.data;
 }
@@ -1045,6 +1054,7 @@ export async function deleteOrderRule(id: string) {
     'POST',
     () => deleteRule(id),
     { id },
+    true,
   );
   return response.data;
 }

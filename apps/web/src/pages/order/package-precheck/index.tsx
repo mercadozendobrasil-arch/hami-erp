@@ -4,6 +4,7 @@ import { Link } from '@umijs/max';
 import { Alert, Button, Drawer, Modal, Space, Tag, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import {
   arrangeShipment,
   getShopeeShippingDocumentParameter,
@@ -35,6 +36,7 @@ const PackagePrecheckPage: React.FC = () => {
   const [liveShippingParameterError, setLiveShippingParameterError] = useState<string>();
   const [liveDocumentParameter, setLiveDocumentParameter] = useState<Record<string, unknown> | null>(null);
   const [liveDocumentParameterError, setLiveDocumentParameterError] = useState<string>();
+  const { shopId } = useResolvedShopId();
 
   const reload = () => actionRef.current?.reload?.();
   const showJsonModal = (title: string, data: unknown) =>
@@ -319,7 +321,11 @@ const PackagePrecheckPage: React.FC = () => {
         rowKey="packageNumber"
         actionRef={actionRef}
         columns={columns}
-        request={queryPackagePrecheck}
+        request={(params) =>
+          shopId
+            ? queryPackagePrecheck({ ...params, shopId })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         search={{ labelWidth: 120 }}
         pagination={{ pageSize: 10 }}
         headerTitle="Package 履约预检工作台"

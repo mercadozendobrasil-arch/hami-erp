@@ -11,6 +11,7 @@ import { Alert, Button, Drawer, Modal, Tag, Tooltip, Typography, message } from 
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
 import OrderOverviewCards from '../components/OrderOverviewCards';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import {
   LOGISTICS_CHANNEL_OPTIONS,
   LOGISTICS_COMPANY_OPTIONS,
@@ -64,6 +65,7 @@ const LogisticsManagementPage: React.FC = () => {
   const [drawerRow, setDrawerRow] = useState<ERP.OrderListItem>();
   const [modalType, setModalType] = useState<LogisticsModalType>(null);
   const [shippingUpdateRow, setShippingUpdateRow] = useState<ERP.OrderListItem>();
+  const { shopId } = useResolvedShopId();
 
   const reload = () => actionRef.current?.reloadAndRest?.();
   const showJsonModal = (title: string, data: unknown) =>
@@ -305,6 +307,7 @@ const LogisticsManagementPage: React.FC = () => {
   return (
       <PageContainer title="物流管理" subTitle="围绕 package_number、get_shipping_parameter、ship_order、get_tracking_number 和 shipping document 状态展示 Shopee 物流链路。">
       <OrderOverviewCards
+        shopId={shopId}
         items={[
           { key: 'total', title: '物流订单总数' },
           { key: 'readyToShipCount', title: '待出货' },
@@ -323,7 +326,11 @@ const LogisticsManagementPage: React.FC = () => {
         rowKey="id"
         actionRef={actionRef}
         columns={columns}
-        request={queryLogisticsOrders}
+        request={(params) =>
+          shopId
+            ? queryLogisticsOrders({ ...params, shopId })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         search={{ labelWidth: 92 }}
         pagination={{ pageSize: 10 }}
         rowSelection={{ onChange: (_, rows) => setSelectedRows(rows) }}

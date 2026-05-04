@@ -2,9 +2,11 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import React from 'react';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import { queryOrderLogs } from '@/services/erp/order';
 
 const LogAuditPage: React.FC = () => {
+  const { shopId } = useResolvedShopId();
   const columns: ProColumns<ERP.OrderLogItem>[] = [
     {
       title: '订单号',
@@ -52,7 +54,9 @@ const LogAuditPage: React.FC = () => {
       <ProTable<ERP.OrderLogItem, ERP.OrderLogQueryParams>
         rowKey="id"
         columns={columns}
-        request={queryOrderLogs}
+        request={(params) =>
+          queryOrderLogs({ ...params, ...(shopId ? { shopId } : {}) })
+        }
         search={{ labelWidth: 92 }}
         pagination={{ pageSize: 10 }}
         headerTitle="日志审计"

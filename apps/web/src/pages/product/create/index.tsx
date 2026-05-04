@@ -14,10 +14,12 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
+import { useQuery } from '@tanstack/react-query';
 import { history, useLocation } from '@umijs/max';
 import { Button, Card, Empty, message, Space, Typography, Upload } from 'antd';
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { createErpProduct } from '@/services/erp/product';
+import { queryShops } from '@/services/erp/shop';
 import './style.less';
 
 const sectionStyle = { marginBottom: 16 };
@@ -32,6 +34,23 @@ const ProductCreatePage: React.FC = () => {
     () => new URLSearchParams(location.search).get('shopId') || undefined,
     [location.search],
   );
+
+  const { data: shopsResponse } = useQuery({
+    queryKey: ['product-create-shops'],
+    queryFn: () => queryShops({ current: 1, pageSize: 100 }),
+    enabled: !shopId,
+  });
+
+  useEffect(() => {
+    const firstShopId = shopsResponse?.data?.[0]?.shopId;
+    if (shopId || !firstShopId) {
+      return;
+    }
+
+    const search = new URLSearchParams(location.search);
+    search.set('shopId', firstShopId);
+    history.replace(`${location.pathname}?${search.toString()}`);
+  }, [location.pathname, location.search, shopId, shopsResponse?.data]);
 
   if (!shopId) {
     return (

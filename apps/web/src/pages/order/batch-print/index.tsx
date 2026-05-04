@@ -4,12 +4,14 @@ import { Button, Space, Tag, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
 import OrderOverviewCards from '../components/OrderOverviewCards';
+import { useResolvedShopId } from '../hooks/useResolvedShopId';
 import { queryOrders } from '@/services/erp/order';
 
 const BatchPrintPage: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
   const [selectedRows, setSelectedRows] = useState<ERP.OrderListItem[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
+  const { shopId } = useResolvedShopId();
 
   const columns: ProColumns<ERP.OrderListItem>[] = [
     { title: '订单号', dataIndex: 'orderNo', copyable: true, width: 180 },
@@ -42,6 +44,7 @@ const BatchPrintPage: React.FC = () => {
       {contextHolder}
       <OrderOverviewCards
         currentTab="pendingShipment"
+        shopId={shopId}
         items={[
           { key: 'total', title: '待打印订单' },
           { key: 'printPendingCount', title: '未打印' },
@@ -53,7 +56,11 @@ const BatchPrintPage: React.FC = () => {
         rowKey="id"
         actionRef={actionRef}
         columns={columns}
-        request={(params) => queryOrders({ ...params, currentTab: 'pendingShipment' })}
+        request={(params) =>
+          shopId
+            ? queryOrders({ ...params, shopId, currentTab: 'pendingShipment' })
+            : Promise.resolve({ success: true, data: [], total: 0 })
+        }
         search={{ labelWidth: 92 }}
         rowSelection={{ onChange: (_, rows) => setSelectedRows(rows) }}
         pagination={{ pageSize: 10 }}
