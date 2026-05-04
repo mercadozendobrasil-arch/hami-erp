@@ -14,6 +14,7 @@ import {
   Alert,
   Button,
   DatePicker,
+  Descriptions,
   Dropdown,
   Empty,
   Form,
@@ -26,6 +27,9 @@ import {
   Modal,
   Select,
   Space,
+  Spin,
+  Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd';
@@ -33,6 +37,7 @@ import dayjs from 'dayjs';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { formatBrazilCurrency } from '@/pages/order/utils/br';
 import {
+  getOnlineProductDetail,
   queryProducts,
   syncRemoteProducts,
   syncProduct,
@@ -125,6 +130,69 @@ function getShopId(record: ProductRecord, fallback?: string) {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringifyValue(value: unknown) {
+  if (value === undefined || value === null || value === '') return '-';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function renderDescriptions(data?: Record<string, unknown>) {
+  const entries = Object.entries(data || {}).filter(
+    ([, value]) => value !== undefined && value !== null && value !== '',
+  );
+  if (!entries.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+
+  return (
+    <Descriptions size="small" bordered column={2}>
+      {entries.map(([key, value]) => (
+        <Descriptions.Item key={key} label={key}>
+          <Typography.Text copyable={{ text: stringifyValue(value) }}>
+            {stringifyValue(value)}
+          </Typography.Text>
+        </Descriptions.Item>
+      ))}
+    </Descriptions>
+  );
+}
+
+function renderRecordTable(records?: Record<string, unknown>[]) {
+  if (!records?.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+
+  const keys = Array.from(new Set(records.flatMap((item) => Object.keys(item)))).slice(0, 8);
+  return (
+    <Table
+      size="small"
+      rowKey={(_, index) => String(index)}
+      pagination={false}
+      scroll={{ x: 900 }}
+      dataSource={records}
+      columns={keys.map((key) => ({
+        title: key,
+        dataIndex: key,
+        key,
+        ellipsis: true,
+        render: (value: unknown) => stringifyValue(value),
+      }))}
+    />
+  );
+}
+
+function getDetailPrice(detail?: ERP.ProductOnlineDetail, record?: ProductRecord) {
+  const rawPrice = detail?.price ?? record?.price;
+  return rawPrice === undefined ? undefined : Number(rawPrice);
+}
+
+function getDetailStock(detail?: ERP.ProductOnlineDetail, record?: ProductRecord) {
+  const rawStock = detail?.stock ?? record?.stock;
+  return rawStock === undefined ? undefined : Number(rawStock);
+}
+
 const ProductListPage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const actionRef = useRef<ActionType | null>(null);
@@ -140,6 +208,8 @@ const ProductListPage: React.FC = () => {
   const [status, setStatus] = useState('ACTIVE');
   const [selectedRows, setSelectedRows] = useState<ProductRecord[]>([]);
   const [editingProduct, setEditingProduct] = useState<ProductRecord>();
+  const [editDetail, setEditDetail] = useState<ERP.ProductOnlineDetail>();
+  const [editLoading, setEditLoading] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm<ERP.ProductOnlineUpdatePayload>();
 
@@ -167,14 +237,42 @@ const ProductListPage: React.FC = () => {
 
   const unavailable = () => messageApi.info('暂未接入');
 
-  const openEdit = (record: ProductRecord) => {
+  const openEdit = async (record: ProductRecord) => {
+    const currentShopId = getShopId(record, shopId);
+    const productId = getLocalProductId(record);
     setEditingProduct(record);
+    setEditDetail(undefined);
     editForm.setFieldsValue({
-      shopId: getShopId(record, shopId),
+      shopId: currentShopId,
       title: record.title,
       price: record.price === undefined ? undefined : Number(record.price),
       stock: record.stock === undefined ? undefined : Number(record.stock),
     });
+
+    if (!productId || !currentShopId) {
+      messageApi.error('缺少商品或店铺ID，无法读取在线详情');
+      return;
+    }
+
+    try {
+      setEditLoading(true);
+      const response = await getOnlineProductDetail(productId, currentShopId);
+      const detail = response.data;
+      setEditDetail(detail);
+      editForm.setFieldsValue({
+        shopId: currentShopId,
+        title: detail.title,
+        description: detail.description,
+        price: getDetailPrice(detail, record),
+        stock: getDetailStock(detail, record),
+      });
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : '读取 Shopee 在线详情失败',
+      );
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const submitEdit = async () => {
@@ -427,6 +525,149 @@ const ProductListPage: React.FC = () => {
         <Modal
           title="编辑在线商品"
           open={Boolean(editingProduct)}
+          confirmLoading={editSubmitting}
+          onOk={submitEdit}
+          onCancel={() => {
+            setEditingProduct(undefined);
+            setEditDetail(undefined);
+          }}
+          width={1120}
+          destroyOnClose
+        >
+          <Spin spinning={editLoading}>
+            <Tabs
+              items={[
+                {
+                  key: 'basic',
+                  label: '基础信息',
+                  children: (
+                    <div className="erp-online-editor-grid">
+                      <Form form={editForm} layout="vertical" preserve={false}>
+                        <Form.Item name="shopId" label="店铺" rules={[{ required: true }]}>
+                          <Input disabled />
+                        </Form.Item>
+                        <Form.Item
+                          name="title"
+                          label="商品标题"
+                          rules={[{ required: true, message: '请输入商品标题' }]}
+                        >
+                          <Input maxLength={120} showCount />
+                        </Form.Item>
+                        <Form.Item name="description" label="商品描述">
+                          <Input.TextArea rows={7} maxLength={3000} showCount />
+                        </Form.Item>
+                        <Space size={12} style={{ width: '100%' }}>
+                          <Form.Item
+                            name="price"
+                            label="价格"
+                            rules={[{ required: true, message: '请输入价格' }]}
+                            style={{ flex: 1 }}
+                          >
+                            <InputNumber min={0} precision={2} style={{ width: 220 }} prefix="R$" />
+                          </Form.Item>
+                          <Form.Item
+                            name="stock"
+                            label="库存"
+                            rules={[{ required: true, message: '请输入库存' }]}
+                            style={{ flex: 1 }}
+                          >
+                            <InputNumber min={0} precision={0} style={{ width: 220 }} />
+                          </Form.Item>
+                        </Space>
+                      </Form>
+                      <Descriptions size="small" bordered column={1}>
+                        <Descriptions.Item label="Shopee Item ID">
+                          {editDetail?.itemId ||
+                            (editingProduct ? getShopeeItemId(editingProduct) : '-') ||
+                            '-'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="分类 ID">
+                          {editDetail?.category?.categoryId || '-'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="分类名称">
+                          {editDetail?.category?.name || '-'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="品牌">
+                          {stringifyValue(editDetail?.brand)}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="重量">
+                          {editDetail?.package?.weight ?? '-'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="尺寸">
+                          {stringifyValue(editDetail?.package?.dimension)}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="状态">
+                          {editDetail?.status || editingProduct?.status || '-'}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'media',
+                  label: '图片视频',
+                  children: (
+                    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                      <div className="erp-media-grid">
+                        {(editDetail?.images || []).map((image) => (
+                          <Image
+                            key={image.imageId || image.url}
+                            width={96}
+                            height={96}
+                            src={image.url}
+                            style={{ objectFit: 'cover', borderRadius: 4 }}
+                          />
+                        ))}
+                        {!editDetail?.images?.length ? (
+                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                        ) : null}
+                      </div>
+                      {renderRecordTable((editDetail?.videos || []).map((video) => asRecord(video)))}
+                    </Space>
+                  ),
+                },
+                {
+                  key: 'attributes',
+                  label: '分类属性',
+                  children: renderRecordTable(editDetail?.attributes),
+                },
+                {
+                  key: 'logistics-tax',
+                  label: '物流税务',
+                  children: (
+                    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                      <Typography.Title level={5}>物流</Typography.Title>
+                      {renderRecordTable(editDetail?.logistics)}
+                      <Typography.Title level={5}>税务</Typography.Title>
+                      {renderDescriptions(editDetail?.tax)}
+                    </Space>
+                  ),
+                },
+                {
+                  key: 'models',
+                  label: 'SKU与原始数据',
+                  children: (
+                    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                      <Typography.Title level={5}>Shopee Models</Typography.Title>
+                      {renderRecordTable(editDetail?.models)}
+                      <Typography.Title level={5}>本地 SKU</Typography.Title>
+                      {renderRecordTable(editDetail?.skus)}
+                      <Typography.Title level={5}>Shopee 原始返回</Typography.Title>
+                      <Typography.Paragraph copyable>
+                        <pre className="erp-raw-json">
+                          {JSON.stringify(editDetail?.raw || {}, null, 2)}
+                        </pre>
+                      </Typography.Paragraph>
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          </Spin>
+        </Modal>
+        <Modal
+          title="编辑在线商品"
+          open={false}
           confirmLoading={editSubmitting}
           onOk={submitEdit}
           onCancel={() => setEditingProduct(undefined)}

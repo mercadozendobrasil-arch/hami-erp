@@ -321,6 +321,41 @@ declare namespace ERP {
     stock?: number;
   };
 
+  type ProductOnlineDetail = Omit<ProductListItem, 'brand'> & {
+    description?: string;
+    category?: {
+      categoryId?: string;
+      name?: string;
+    };
+    brand?: Record<string, unknown> | string;
+    attributes?: Record<string, unknown>[];
+    images?: Array<{
+      imageId?: string;
+      url?: string;
+    }>;
+    videos?: Array<{
+      videoId?: string;
+      videoUrl?: string;
+      thumbnailUrl?: string;
+      duration?: number;
+      raw?: Record<string, unknown>;
+    }>;
+    logistics?: Record<string, unknown>[];
+    tax?: Record<string, unknown>;
+    package?: {
+      weight?: number;
+      dimension?: Record<string, unknown>;
+    };
+    models?: Record<string, unknown>[];
+    skus?: Record<string, unknown>[];
+    platformProducts?: Record<string, unknown>[];
+    raw?: {
+      baseInfo?: Record<string, unknown>;
+      extraInfo?: Record<string, unknown>;
+      modelInfo?: Record<string, unknown>;
+    };
+  };
+
   type SkuMappingQueryParams = PageParams & {
     shopId?: string;
   };

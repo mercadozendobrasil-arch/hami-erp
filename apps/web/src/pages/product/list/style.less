@@ -53,3 +53,35 @@
   padding-top: 10px;
   padding-bottom: 10px;
 }
+
+.erp-online-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.erp-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 96px);
+  gap: 10px;
+  min-height: 96px;
+}
+
+.erp-raw-json {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  margin: 0;
+  background: #f7f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .erp-online-editor-grid {
+    grid-template-columns: 1fr;
+  }
+}

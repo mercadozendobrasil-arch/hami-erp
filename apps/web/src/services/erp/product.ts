@@ -27,6 +27,16 @@ export async function updateOnlineProduct(
   );
 }
 
+export async function getOnlineProductDetail(productId: string, shopId: string) {
+  return request<ERP.ApiResponse<ERP.ProductOnlineDetail>>(
+    `/api/erp/products/${productId}/online`,
+    {
+      method: 'GET',
+      params: { shopId },
+    },
+  );
+}
+
 export async function queryMissingSkuMappings(params: ERP.SkuMappingQueryParams) {
   return request<API.ListResponse<ERP.MissingSkuMappingItem>>(
     '/api/erp/products/sku-mappings/missing',

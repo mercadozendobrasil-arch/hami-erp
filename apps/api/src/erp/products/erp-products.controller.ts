@@ -50,6 +50,14 @@ export class ErpProductsController {
     return this.erpProductsService.syncRemoteProducts(shopId);
   }
 
+  @Get(':productId/online')
+  getOnlineProduct(
+    @Param('productId') productId: string,
+    @Query('shopId') shopId: string,
+  ) {
+    return this.erpProductsService.getOnlineProduct(productId, shopId);
+  }
+
   @Get(':productId')
   getProduct(
     @Param('productId') productId: string,

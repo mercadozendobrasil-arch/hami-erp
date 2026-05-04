@@ -125,6 +125,123 @@ export class ErpProductsService {
     };
   }
 
+  async getOnlineProduct(productId: string, shopIdRaw: string) {
+    if (!shopIdRaw) {
+      throw new NotFoundException('Shopee shop id is required.');
+    }
+
+    const product = await this.prismaService.erpProduct.findUnique({
+      where: { id: productId },
+      include: {
+        skus: true,
+        platformProducts: {
+          where: { shopId: shopIdRaw },
+          include: { skus: true },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('ERP product not found.');
+    }
+
+    const platformProduct = product.platformProducts[0];
+    if (!platformProduct?.itemId) {
+      throw new NotFoundException('Shopee item binding not found for this product.');
+    }
+
+    const shopId = BigInt(shopIdRaw);
+    const { token } =
+      await this.shopeeTokenService.findRequiredTokenByShopId(shopId);
+    const context = {
+      shopId: Number(shopId),
+      accessToken: token.accessToken,
+    };
+    const itemId = Number(platformProduct.itemId);
+
+    const [baseInfo, extraInfo, modelInfo] = await Promise.all([
+      this.productSdk.getItemBaseInfo(context, [itemId]),
+      this.productSdk.getItemExtraInfo(context, [itemId]),
+      this.productSdk.getModelList(context, itemId),
+    ]);
+
+    const baseItem =
+      this.arrayRecords((baseInfo as Record<string, unknown>).item_list)[0] ??
+      {};
+    const extraItem =
+      this.arrayRecords((extraInfo as Record<string, unknown>).item_list)[0] ??
+      {};
+    const modelList = this.arrayRecords(
+      (modelInfo as Record<string, unknown>).model ??
+        (modelInfo as Record<string, unknown>).model_list,
+    );
+    const remote = { ...extraItem, ...baseItem };
+
+    return {
+      success: true,
+      data: {
+        ...this.toListItem(product),
+        description:
+          this.optionalString(remote.description) ?? product.description ?? '',
+        category: {
+          categoryId: this.optionalString(
+            remote.category_id ?? remote.categoryId,
+          ),
+          name: this.optionalString(
+            remote.category_name ??
+              remote.categoryName ??
+              this.asRecord(remote.category).display_name,
+          ),
+        },
+        brand: this.asRecord(remote.brand),
+        attributes: this.arrayRecords(
+          remote.attribute_list ??
+            remote.attributeList ??
+            remote.attributes ??
+            remote.attribute,
+        ),
+        images: this.normalizeShopeeImages(remote),
+        videos: this.normalizeShopeeVideos(remote),
+        logistics: this.arrayRecords(
+          remote.logistic_info ??
+            remote.logisticInfo ??
+            remote.logistics ??
+            remote.logistic_list,
+        ),
+        tax: this.asRecord(remote.tax_info ?? remote.taxInfo),
+        package: {
+          weight: this.optionalNumber(remote.weight),
+          dimension: this.asRecord(remote.dimension),
+        },
+        models: modelList,
+        skus: product.skus.map((sku) => ({
+          id: sku.id,
+          skuCode: sku.skuCode,
+          barcode: sku.barcode,
+          optionName: sku.optionName,
+          optionValue: sku.optionValue,
+          status: sku.status,
+          price: sku.price?.toString(),
+          costPrice: sku.costPrice?.toString(),
+          stock: sku.stock,
+        })),
+        platformProducts: product.platformProducts.map((binding) => ({
+          id: binding.id,
+          platform: binding.platform,
+          shopId: binding.shopId,
+          itemId: binding.itemId,
+          publishStatus: binding.publishStatus,
+          lastSyncedAt: binding.lastSyncedAt?.toISOString(),
+        })),
+        raw: {
+          baseInfo: baseItem,
+          extraInfo: extraItem,
+          modelInfo,
+        },
+      },
+    };
+  }
+
   async createProduct(payload: CreateErpProductDto) {
     const product = await this.prismaService.erpProduct.create({
       data: {
@@ -981,6 +1098,44 @@ export class ErpProductsService {
     return stringList
       .map((item) => this.optionalString(item))
       .find(Boolean);
+  }
+
+  private normalizeShopeeImages(remote: Record<string, unknown>) {
+    const image = this.asRecord(remote.image);
+    const imageIds = [
+      ...(Array.isArray(image.image_id_list) ? image.image_id_list : []),
+      ...(Array.isArray(image.imageIdList) ? image.imageIdList : []),
+      ...(Array.isArray(remote.image_id_list) ? remote.image_id_list : []),
+      ...(Array.isArray(remote.imageIdList) ? remote.imageIdList : []),
+    ];
+    const imageUrls = [
+      ...(Array.isArray(image.image_url_list) ? image.image_url_list : []),
+      ...(Array.isArray(image.imageUrlList) ? image.imageUrlList : []),
+      ...(Array.isArray(remote.image_url_list) ? remote.image_url_list : []),
+      ...(Array.isArray(remote.imageUrlList) ? remote.imageUrlList : []),
+    ];
+
+    return imageUrls
+      .map((url, index) => ({
+        imageId: this.optionalString(imageIds[index]),
+        url: this.optionalString(url),
+      }))
+      .filter((item) => item.imageId || item.url);
+  }
+
+  private normalizeShopeeVideos(remote: Record<string, unknown>) {
+    return [
+      ...this.arrayRecords(remote.video_info ?? remote.videoInfo),
+      ...this.arrayRecords(remote.video_list ?? remote.videoList),
+    ].map((video) => ({
+      videoId: this.optionalString(video.video_id ?? video.videoId),
+      videoUrl: this.optionalString(video.video_url ?? video.videoUrl),
+      thumbnailUrl: this.optionalString(
+        video.thumbnail_url ?? video.thumbnailUrl,
+      ),
+      duration: this.optionalNumber(video.duration),
+      raw: video,
+    }));
   }
 
   private collectOrderSkuCandidates(
