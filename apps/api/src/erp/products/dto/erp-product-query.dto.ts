@@ -8,6 +8,10 @@ export class ErpProductQueryDto {
 
   @IsOptional()
   @IsString()
+  token?: string;
+
+  @IsOptional()
+  @IsString()
   title?: string;
 
   @IsOptional()
