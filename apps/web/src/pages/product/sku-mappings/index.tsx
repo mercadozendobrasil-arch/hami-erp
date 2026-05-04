@@ -54,9 +54,19 @@ const MappingPage: React.FC = () => {
 
   const { data: skusResponse, isFetching: loadingSkus } = useQuery({
     queryKey: ['erp-skus', shopId, skuKeyword],
-    queryFn: () =>
-      queryErpSkus({ current: 1, pageSize: 50, shopId, keyword: skuKeyword }),
-    enabled: Boolean(shopId),
+    queryFn: async () => {
+      try {
+        return await queryErpSkus({
+          current: 1,
+          pageSize: 50,
+          shopId,
+          keyword: skuKeyword,
+        });
+      } catch {
+        return { success: true, data: [], total: 0 };
+      }
+    },
+    enabled: Boolean(shopId && bindingRecord),
   });
 
   const shopOptions = useMemo(
@@ -258,6 +268,10 @@ const MappingPage: React.FC = () => {
           columns={columns}
           scroll={{ x: 1240 }}
           request={async (params) => {
+            if (!shopId) {
+              return { success: true, data: [], total: 0 };
+            }
+
             try {
               const response = await queryMissingSkuMappings({
                 ...params,
