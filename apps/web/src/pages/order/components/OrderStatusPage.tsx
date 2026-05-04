@@ -55,6 +55,7 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
     enabled: !effectiveShopId,
   });
   const firstShopId = shopsResponse?.data?.[0]?.shopId;
+  const resolvedShopId = effectiveShopId || firstShopId;
 
   useEffect(() => {
     if (effectiveShopId || !firstShopId) {
@@ -114,15 +115,24 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   const fulfillmentStage = TAB_TO_FULFILLMENT_STAGE[currentTab];
   const request = live
     ? (params: ERP.OrderQueryParams) =>
-        queryLiveOrders({ ...params, shopId: effectiveShopId, fulfillmentStage })
+        queryLiveOrders({ ...params, shopId: resolvedShopId, fulfillmentStage })
     : queryOrders;
 
   return (
     <PageContainer title={title} subTitle={subTitle}>
+      {!resolvedShopId ? (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="正在加载店铺上下文"
+          description="订单中心会自动选择已授权店铺后再加载订单。"
+        />
+      ) : null}
       {overviewItemsMap[currentTab]?.length ? (
         <OrderOverviewCards
           currentTab={currentTab}
-          shopId={effectiveShopId}
+          shopId={resolvedShopId}
           live={live}
           items={overviewItemsMap[currentTab]}
         />
@@ -136,7 +146,14 @@ const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
           description={alertDescription}
         />
       ) : null}
-      <OrderTable request={request} headerTitle={headerTitle} currentTab={currentTab} />
+      {resolvedShopId ? (
+        <OrderTable
+          key={`${currentTab}:${resolvedShopId}`}
+          request={request}
+          headerTitle={headerTitle}
+          currentTab={currentTab}
+        />
+      ) : null}
     </PageContainer>
   );
 };
