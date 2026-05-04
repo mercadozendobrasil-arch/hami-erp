@@ -265,7 +265,14 @@ export class ProductSdk {
       path: '/product/update_price',
       accessToken: context.accessToken,
       shopId: context.shopId,
-      body: toShopeePayload(payload),
+      body: toShopeePayload({
+        itemId: payload.itemId,
+        priceList: payload.models.map((model) => ({
+          modelId: model.modelId,
+          originalPrice: model.originalPrice,
+          currentPrice: model.currentPrice,
+        })),
+      }),
     });
   }
 
@@ -278,7 +285,19 @@ export class ProductSdk {
       path: '/product/update_stock',
       accessToken: context.accessToken,
       shopId: context.shopId,
-      body: toShopeePayload(payload),
+      body: toShopeePayload({
+        itemId: payload.itemId,
+        stockList: payload.models.map((model) => ({
+          modelId: model.modelId,
+          normalStock: model.sellerStock,
+          sellerStock: [
+            {
+              locationId: model.locationId,
+              stock: model.sellerStock,
+            },
+          ],
+        })),
+      }),
     });
   }
 
