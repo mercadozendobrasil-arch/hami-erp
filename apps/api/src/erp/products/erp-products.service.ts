@@ -170,21 +170,39 @@ export class ErpProductsService {
         orderBy: { createdAt: 'desc' },
       });
 
-    const [baseInfo, extraInfo, modelInfo] = await Promise.all([
+    const [baseInfoResult, extraInfoResult, modelInfoResult] = await Promise.allSettled([
       this.productSdk.getItemBaseInfo(context, [itemId]),
       this.productSdk.getItemExtraInfo(context, [itemId]),
       this.productSdk.getModelList(context, itemId),
     ]);
+    const baseInfo =
+      baseInfoResult.status === 'fulfilled'
+        ? (baseInfoResult.value as Record<string, unknown>)
+        : {};
+    const extraInfo =
+      extraInfoResult.status === 'fulfilled'
+        ? (extraInfoResult.value as Record<string, unknown>)
+        : {};
+    const modelInfo =
+      modelInfoResult.status === 'fulfilled'
+        ? (modelInfoResult.value as Record<string, unknown>)
+        : {};
+    const liveErrors = [
+      this.toLiveFetchError('baseInfo', baseInfoResult),
+      this.toLiveFetchError('extraInfo', extraInfoResult),
+      this.toLiveFetchError('modelInfo', modelInfoResult),
+    ].filter((item): item is { scope: string; message: string } =>
+      Boolean(item),
+    );
 
     const baseItem =
-      this.arrayRecords((baseInfo as Record<string, unknown>).item_list)[0] ??
+      this.arrayRecords(baseInfo.item_list)[0] ??
       {};
     const extraItem =
-      this.arrayRecords((extraInfo as Record<string, unknown>).item_list)[0] ??
+      this.arrayRecords(extraInfo.item_list)[0] ??
       {};
     const modelList = this.arrayRecords(
-      (modelInfo as Record<string, unknown>).model ??
-        (modelInfo as Record<string, unknown>).model_list,
+      modelInfo.model ?? modelInfo.model_list,
     );
     const platformRaw = this.asRecord(platformProduct.raw);
     const onlineUpdate = this.asRecord(platformRaw.onlineUpdate);
@@ -206,23 +224,9 @@ export class ErpProductsService {
         ...this.toListItem(product),
         description:
           this.optionalString(remote.description) ?? product.description ?? '',
-        category: {
-          categoryId: this.optionalString(
-            remote.category_id ?? remote.categoryId,
-          ),
-          name: this.optionalString(
-            remote.category_name ??
-              remote.categoryName ??
-              this.asRecord(remote.category).display_name,
-          ),
-        },
+        category: this.normalizeShopeeCategory(remote),
         brand: this.asRecord(remote.brand),
-        attributes: this.arrayRecords(
-          remote.attribute_list ??
-            remote.attributeList ??
-            remote.attributes ??
-            remote.attribute,
-        ),
+        attributes: this.normalizeShopeeAttributes(remote),
         images: this.normalizeShopeeImages(remote),
         videos: this.normalizeShopeeVideos(remote),
         logistics: this.arrayRecords(
@@ -260,6 +264,7 @@ export class ErpProductsService {
           baseInfo: baseItem,
           extraInfo: extraItem,
           modelInfo,
+          liveErrors,
         },
       },
     };
@@ -1146,15 +1151,140 @@ export class ErpProductsService {
       .filter((item) => item.imageId || item.url);
   }
 
+  private toLiveFetchError(
+    scope: string,
+    result: PromiseSettledResult<unknown>,
+  ) {
+    if (result.status !== 'rejected') return undefined;
+
+    return {
+      scope,
+      message:
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason),
+    };
+  }
+
+  private normalizeShopeeCategory(remote: Record<string, unknown>) {
+    const category = this.asRecord(remote.category);
+    const categoryPath = this.arrayRecords(
+      remote.category_path ?? remote.categoryPath,
+    );
+    const pathName = categoryPath
+      .map((item) =>
+        this.optionalString(
+          item.display_name ??
+            item.category_name ??
+            item.categoryName ??
+            item.name,
+        ),
+      )
+      .filter(Boolean)
+      .join(' > ');
+
+    return {
+      categoryId: this.optionalString(
+        remote.category_id ??
+          remote.categoryId ??
+          category.category_id ??
+          category.categoryId,
+      ),
+      name:
+        pathName ||
+        this.optionalString(
+          remote.category_name ??
+            remote.categoryName ??
+            category.display_name ??
+            category.category_name ??
+            category.categoryName ??
+            category.name,
+        ),
+    };
+  }
+
+  private normalizeShopeeAttributes(remote: Record<string, unknown>) {
+    return this.arrayRecords(
+      remote.attribute_list ??
+        remote.attributeList ??
+        remote.attributes ??
+        remote.attribute,
+    ).map((attribute) => {
+      const valueList = this.arrayRecords(
+        attribute.value_list ??
+          attribute.valueList ??
+          attribute.values ??
+          attribute.value,
+      );
+      const values = valueList
+        .map((value) =>
+          this.optionalString(
+            value.original_value_name ??
+              value.value_name ??
+              value.valueName ??
+              value.name ??
+              value.value_id ??
+              value.valueId,
+          ),
+        )
+        .filter(Boolean);
+
+      return {
+        ...attribute,
+        attributeId: this.optionalString(
+          attribute.attribute_id ?? attribute.attributeId,
+        ),
+        name: this.optionalString(
+          attribute.original_attribute_name ??
+            attribute.attribute_name ??
+            attribute.attributeName ??
+            attribute.name,
+        ),
+        value:
+          values.join(', ') ||
+          this.optionalString(
+            attribute.value_name ??
+              attribute.valueName ??
+              attribute.value ??
+              attribute.value_id ??
+              attribute.valueId,
+          ),
+      };
+    });
+  }
+
   private normalizeShopeeVideos(remote: Record<string, unknown>) {
-    return [
+    const videoInfo = this.asRecord(remote.video_info ?? remote.videoInfo);
+    const videoRecords = [
       ...this.arrayRecords(remote.video_info ?? remote.videoInfo),
       ...this.arrayRecords(remote.video_list ?? remote.videoList),
-    ].map((video) => ({
+      ...this.arrayRecords(videoInfo.video_list ?? videoInfo.videoList),
+    ];
+    const videoIds = [
+      ...(Array.isArray(videoInfo.video_id_list) ? videoInfo.video_id_list : []),
+      ...(Array.isArray(videoInfo.videoIdList) ? videoInfo.videoIdList : []),
+      ...(Array.isArray(remote.video_id_list) ? remote.video_id_list : []),
+      ...(Array.isArray(remote.videoIdList) ? remote.videoIdList : []),
+    ];
+
+    if (!videoRecords.length && videoIds.length) {
+      videoRecords.push(
+        ...videoIds.map((videoId) => ({
+          video_id: videoId,
+        })),
+      );
+    }
+
+    return videoRecords.map((video) => ({
       videoId: this.optionalString(video.video_id ?? video.videoId),
-      videoUrl: this.optionalString(video.video_url ?? video.videoUrl),
+      videoUrl: this.optionalString(
+        video.video_url ?? video.videoUrl ?? video.url,
+      ),
       thumbnailUrl: this.optionalString(
-        video.thumbnail_url ?? video.thumbnailUrl,
+        video.thumbnail_url ??
+          video.thumbnailUrl ??
+          video.cover_url ??
+          video.coverUrl,
       ),
       duration: this.optionalNumber(video.duration),
       raw: video,

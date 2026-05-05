@@ -205,6 +205,63 @@ function getEditorImages(
   return fallback ? [{ url: String(fallback) }] : [];
 }
 
+function getAttributeName(attribute: Record<string, unknown>) {
+  return String(
+    attribute.name ||
+      attribute.original_attribute_name ||
+      attribute.attribute_name ||
+      attribute.attributeName ||
+      attribute.attributeId ||
+      attribute.attribute_id ||
+      'Attribute',
+  );
+}
+
+function getAttributeDisplayValue(attribute: Record<string, unknown>) {
+  const direct =
+    attribute.value ||
+    attribute.value_name ||
+    attribute.valueName ||
+    attribute.original_value_name;
+  if (direct !== undefined && direct !== null && direct !== '') {
+    return stringifyValue(direct);
+  }
+
+  const values = [
+    ...(Array.isArray(attribute.value_list) ? attribute.value_list : []),
+    ...(Array.isArray(attribute.valueList) ? attribute.valueList : []),
+    ...(Array.isArray(attribute.values) ? attribute.values : []),
+  ]
+    .map((value) => {
+      const record = asRecord(value);
+      return (
+        record.original_value_name ||
+        record.value_name ||
+        record.valueName ||
+        record.name ||
+        value
+      );
+    })
+    .filter((value) => value !== undefined && value !== null && value !== '')
+    .map(stringifyValue);
+
+  return values.length ? values.join(', ') : '-';
+}
+
+function getEditorAttributes(detail?: ERP.ProductOnlineDetail) {
+  return detail?.attributes?.length ? detail.attributes : [];
+}
+
+function getVideoRows(detail?: ERP.ProductOnlineDetail) {
+  return (detail?.videos || []).map((video, index) => ({
+    key: video.videoId || video.videoUrl || String(index),
+    videoId: video.videoId,
+    videoUrl: video.videoUrl,
+    thumbnailUrl: video.thumbnailUrl,
+    duration: video.duration,
+  }));
+}
+
 const ProductListPage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const actionRef = useRef<ActionType | null>(null);
@@ -607,37 +664,23 @@ const ProductListPage: React.FC = () => {
                     <Form.Item label="品牌">
                       <Input value={stringifyValue(editDetail?.brand)} readOnly />
                     </Form.Item>
-                    {[
-                      'Ingredient Feature',
-                      'Peso do Produto',
-                      'Produto personalizado',
-                      'Delta especializada',
-                      'Quantidade por Pacote',
-                      'Aerosol',
-                      'Duração da Garantia',
-                      'Tamanho Do Pacote',
-                      'Tipo de Garantia',
-                      'Quantidade',
-                      'Aroma',
-                      'Volume',
-                      'Dimensões do Produto',
-                      'País de Origem',
-                      'Tipo de Agente de Limpeza',
-                      'Formulação',
-                      'Número de Registro da FDA',
-                    ].map((label) => (
-                      <Form.Item key={label} label={label}>
-                        <Input
-                          value={stringifyValue(
-                            (editDetail?.attributes || []).find((item) =>
-                              stringifyValue(item).includes(label),
-                            ),
+                    {getEditorAttributes(editDetail).length ? (
+                      getEditorAttributes(editDetail).map((attribute, index) => (
+                        <Form.Item
+                          key={String(
+                            attribute.attributeId ??
+                              attribute.attribute_id ??
+                              getAttributeName(attribute) ??
+                              index,
                           )}
-                          placeholder="请输入"
-                          readOnly
-                        />
-                      </Form.Item>
-                    ))}
+                          label={getAttributeName(attribute)}
+                        >
+                          <Input value={getAttributeDisplayValue(attribute)} readOnly />
+                        </Form.Item>
+                      ))
+                    ) : (
+                      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未读取到产品属性" />
+                    )}
                     <div className="erp-section-more">收起属性</div>
                   </Card>
 
@@ -715,7 +758,54 @@ const ProductListPage: React.FC = () => {
                       </div>
                     </Form.Item>
                     <Form.Item label="产品视频">
-                      {renderRecordTable((editDetail?.videos || []).map((video) => asRecord(video)))}
+                      <Table
+                        size="small"
+                        rowKey="key"
+                        pagination={false}
+                        locale={{ emptyText: '未读取到产品视频' }}
+                        dataSource={getVideoRows(editDetail)}
+                        columns={[
+                          {
+                            title: '封面',
+                            dataIndex: 'thumbnailUrl',
+                            width: 92,
+                            render: (url?: string) =>
+                              url ? (
+                                <Image
+                                  width={64}
+                                  height={64}
+                                  src={url}
+                                  style={{ objectFit: 'cover', borderRadius: 4 }}
+                                />
+                              ) : (
+                                '-'
+                              ),
+                          },
+                          {
+                            title: 'Video ID',
+                            dataIndex: 'videoId',
+                            render: (value?: string) => value || '-',
+                          },
+                          {
+                            title: '视频链接',
+                            dataIndex: 'videoUrl',
+                            render: (value?: string) =>
+                              value ? (
+                                <Typography.Link href={value} target="_blank">
+                                  打开视频
+                                </Typography.Link>
+                              ) : (
+                                '-'
+                              ),
+                          },
+                          {
+                            title: '时长',
+                            dataIndex: 'duration',
+                            width: 90,
+                            render: (value?: number) => value ?? '-',
+                          },
+                        ]}
+                      />
                     </Form.Item>
                   </Card>
 
