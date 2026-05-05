@@ -13,6 +13,8 @@ import { history, useLocation } from '@umijs/max';
 import {
   Alert,
   Button,
+  Card,
+  Checkbox,
   DatePicker,
   Descriptions,
   Dropdown,
@@ -25,6 +27,7 @@ import {
   Menu,
   message,
   Modal,
+  Radio,
   Select,
   Space,
   Spin,
@@ -523,8 +526,261 @@ const ProductListPage: React.FC = () => {
       </Sider>
       <Content className="erp-content">
         <Modal
-          title="编辑在线商品"
+          title="Shopee / 编辑产品"
           open={Boolean(editingProduct)}
+          confirmLoading={editSubmitting}
+          onOk={submitEdit}
+          okText="更新"
+          cancelText="取消"
+          onCancel={() => {
+            setEditingProduct(undefined);
+            setEditDetail(undefined);
+          }}
+          width="86vw"
+          className="erp-shopee-editor-modal"
+          destroyOnClose
+        >
+          <Spin spinning={editLoading}>
+            <div className="erp-shopee-editor-shell">
+              <div className="erp-shopee-editor-main">
+                <Form
+                  form={editForm}
+                  layout="horizontal"
+                  labelCol={{ flex: '130px' }}
+                  wrapperCol={{ flex: '1 1 auto' }}
+                  colon={false}
+                  preserve={false}
+                >
+                  <Card id="erp-edit-basic" title="基本信息" size="small">
+                    <Form.Item name="shopId" label="店铺" rules={[{ required: true }]}>
+                      <Input disabled />
+                    </Form.Item>
+                    <Form.Item
+                      name="title"
+                      label="产品标题"
+                      rules={[{ required: true, message: '请输入商品标题' }]}
+                    >
+                      <Input maxLength={120} showCount />
+                    </Form.Item>
+                    <Form.Item label="分类">
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Input
+                          value={[
+                            editDetail?.category?.categoryId,
+                            editDetail?.category?.name,
+                          ]
+                            .filter(Boolean)
+                            .join(' / ')}
+                          placeholder="未读取到分类"
+                          readOnly
+                        />
+                        <Button>选择分类</Button>
+                      </Space.Compact>
+                    </Form.Item>
+                    <Form.Item name="description" label="产品描述">
+                      <Input.TextArea rows={8} maxLength={3000} showCount />
+                    </Form.Item>
+                    <Form.Item label="父SKU">
+                      <Input value={editingProduct?.parentSku || '-'} readOnly />
+                    </Form.Item>
+                    <Form.Item label="产品状况">
+                      <Radio.Group value="NEW">
+                        <Radio value="NEW">新品</Radio>
+                        <Radio value="USED">二手</Radio>
+                      </Radio.Group>
+                    </Form.Item>
+                    <Form.Item label="来源链接">
+                      <Input placeholder="请输入" />
+                    </Form.Item>
+                  </Card>
+
+                  <Card id="erp-edit-attributes" title="属性" size="small">
+                    <Form.Item label="品牌">
+                      <Input value={stringifyValue(editDetail?.brand)} readOnly />
+                    </Form.Item>
+                    {[
+                      'Ingredient Feature',
+                      'Peso do Produto',
+                      'Produto personalizado',
+                      'Delta especializada',
+                      'Quantidade por Pacote',
+                      'Aerosol',
+                      'Duração da Garantia',
+                      'Tamanho Do Pacote',
+                      'Tipo de Garantia',
+                      'Quantidade',
+                      'Aroma',
+                      'Volume',
+                      'Dimensões do Produto',
+                      'País de Origem',
+                      'Tipo de Agente de Limpeza',
+                      'Formulação',
+                      'Número de Registro da FDA',
+                    ].map((label) => (
+                      <Form.Item key={label} label={label}>
+                        <Input
+                          value={stringifyValue(
+                            (editDetail?.attributes || []).find((item) =>
+                              stringifyValue(item).includes(label),
+                            ),
+                          )}
+                          placeholder="请输入"
+                          readOnly
+                        />
+                      </Form.Item>
+                    ))}
+                    <div className="erp-section-more">收起属性</div>
+                  </Card>
+
+                  <Card id="erp-edit-sales" title="销售信息" size="small">
+                    <Form.Item label="类型">
+                      <Radio.Group value={editDetail?.models?.length ? 'multi' : 'single'}>
+                        <Radio value="single">单品</Radio>
+                        <Radio value="multi">多变种</Radio>
+                      </Radio.Group>
+                    </Form.Item>
+                    <Form.Item
+                      name="price"
+                      label="价格"
+                      rules={[{ required: true, message: '请输入价格' }]}
+                    >
+                      <InputNumber min={0} precision={2} prefix="R$" style={{ width: 260 }} />
+                    </Form.Item>
+                    <Form.Item
+                      name="stock"
+                      label="库存"
+                      rules={[{ required: true, message: '请输入库存' }]}
+                    >
+                      <InputNumber min={0} precision={0} style={{ width: 260 }} />
+                    </Form.Item>
+                    <Form.Item label="变种">
+                      <div className="erp-variation-box">
+                        <div className="erp-variation-toolbar">
+                          <Button type="link">+ Shopee 颜色</Button>
+                          <Button type="link">+ 颜色</Button>
+                          <Button type="link">+ 尺寸</Button>
+                          <Button type="link">+ 添加自定义变种</Button>
+                        </div>
+                        <Space wrap>
+                          {(editDetail?.models?.length ? editDetail.models : [{ model_id: 0 }]).map(
+                            (model, index) => (
+                              <Checkbox key={String(model.model_id ?? index)} checked>
+                                {stringifyValue(model.model_name ?? model.modelName ?? `Model ${index + 1}`)}
+                              </Checkbox>
+                            ),
+                          )}
+                        </Space>
+                        <div className="erp-model-images">
+                          {(editDetail?.images || []).slice(0, 3).map((image) => (
+                            <Image
+                              key={image.imageId || image.url}
+                              width={64}
+                              height={64}
+                              src={image.url}
+                              style={{ objectFit: 'cover', borderRadius: 4 }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </Form.Item>
+                    {renderRecordTable(editDetail?.models?.length ? editDetail.models : editDetail?.skus)}
+                  </Card>
+
+                  <Card id="erp-edit-media" title="媒体文件" size="small">
+                    <Form.Item label="产品图片">
+                      <div className="erp-template-media-grid">
+                        {(editDetail?.images || []).map((image, index) => (
+                          <div className="erp-template-media-item" key={image.imageId || image.url}>
+                            <Image
+                              width={86}
+                              height={86}
+                              src={image.url}
+                              style={{ objectFit: 'cover' }}
+                            />
+                            <Typography.Text type="secondary">{index + 1}/9</Typography.Text>
+                          </div>
+                        ))}
+                        {!editDetail?.images?.length ? (
+                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                        ) : null}
+                      </div>
+                    </Form.Item>
+                    <Form.Item label="产品视频">
+                      {renderRecordTable((editDetail?.videos || []).map((video) => asRecord(video)))}
+                    </Form.Item>
+                  </Card>
+
+                  <Card id="erp-edit-logistics" title="物流" size="small">
+                    <Form.Item label="包裹重量">
+                      <Space.Compact>
+                        <InputNumber value={editDetail?.package?.weight} min={0} precision={2} />
+                        <Input value="kg" style={{ width: 64 }} readOnly />
+                      </Space.Compact>
+                    </Form.Item>
+                    <Form.Item label="包裹尺寸">
+                      <Space>
+                        <Input value={stringifyValue(asRecord(editDetail?.package?.dimension).package_length)} suffix="cm" readOnly />
+                        <Input value={stringifyValue(asRecord(editDetail?.package?.dimension).package_width)} suffix="cm" readOnly />
+                        <Input value={stringifyValue(asRecord(editDetail?.package?.dimension).package_height)} suffix="cm" readOnly />
+                      </Space>
+                    </Form.Item>
+                    <Form.Item label="物流">
+                      <div className="erp-logistics-list">
+                        {(editDetail?.logistics || []).map((item, index) => (
+                          <div className="erp-logistics-row" key={String(item.logistic_id ?? index)}>
+                            <Checkbox checked={Boolean(item.enabled ?? true)} />
+                            <div>
+                              <Typography.Text strong>
+                                {stringifyValue(item.logistic_name ?? item.logisticName ?? item.logistic_id)}
+                              </Typography.Text>
+                              <Typography.Text type="secondary">
+                                {stringifyValue(item.shipping_fee ?? item.shippingFee ?? 'Shopee物流渠道')}
+                              </Typography.Text>
+                            </div>
+                            <Typography.Text type="secondary">运费</Typography.Text>
+                          </div>
+                        ))}
+                      </div>
+                    </Form.Item>
+                  </Card>
+
+                  <Card id="erp-edit-tax" title="税务信息" size="small">
+                    {[
+                      ['NCM', 'ncm'],
+                      ['CEST', 'cest'],
+                      ['CFOP (同州)', 'same_state_cfop'],
+                      ['CFOP (跨州)', 'diff_state_cfop'],
+                      ['CSOSN', 'csosn'],
+                      ['单位', 'measure_unit'],
+                      ['原产地', 'origin'],
+                    ].map(([label, key]) => (
+                      <Form.Item key={key} label={label}>
+                        <Input value={stringifyValue(editDetail?.tax?.[key])} readOnly />
+                      </Form.Item>
+                    ))}
+                  </Card>
+                </Form>
+              </div>
+              <div className="erp-shopee-editor-nav">
+                {[
+                  ['erp-edit-basic', '基本信息'],
+                  ['erp-edit-attributes', '属性'],
+                  ['erp-edit-sales', '销售信息'],
+                  ['erp-edit-media', '媒体文件'],
+                  ['erp-edit-logistics', '物流'],
+                  ['erp-edit-tax', '税务信息'],
+                ].map(([id, label]) => (
+                  <a key={id} href={`#${id}`}>
+                    {label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </Spin>
+        </Modal>
+        <Modal
+          title="编辑在线商品"
+          open={false}
           confirmLoading={editSubmitting}
           onOk={submitEdit}
           onCancel={() => {
