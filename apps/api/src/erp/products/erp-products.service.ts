@@ -175,9 +175,11 @@ export class ErpProductsService {
       (modelInfo as Record<string, unknown>).model ??
         (modelInfo as Record<string, unknown>).model_list,
     );
+    const platformRaw = this.asRecord(platformProduct.raw);
     const remote = {
       ...this.asRecord(product.raw),
-      ...this.asRecord(platformProduct.raw),
+      ...platformRaw,
+      ...this.asRecord(platformRaw.item),
       ...extraItem,
       ...baseItem,
     };
