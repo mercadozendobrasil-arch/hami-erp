@@ -1278,7 +1278,9 @@ export class ErpProductsService {
     ).map((attribute) => {
       const valueList = this.arrayRecords(
         attribute.value_list ??
+          attribute.attribute_value_list ??
           attribute.valueList ??
+          attribute.attributeValueList ??
           attribute.values ??
           attribute.value,
       );

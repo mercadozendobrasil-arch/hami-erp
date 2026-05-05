@@ -229,7 +229,13 @@ function getAttributeDisplayValue(attribute: Record<string, unknown>) {
 
   const values = [
     ...(Array.isArray(attribute.value_list) ? attribute.value_list : []),
+    ...(Array.isArray(attribute.attribute_value_list)
+      ? attribute.attribute_value_list
+      : []),
     ...(Array.isArray(attribute.valueList) ? attribute.valueList : []),
+    ...(Array.isArray(attribute.attributeValueList)
+      ? attribute.attributeValueList
+      : []),
     ...(Array.isArray(attribute.values) ? attribute.values : []),
   ]
     .map((value) => {
