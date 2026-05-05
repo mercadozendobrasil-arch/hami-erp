@@ -219,7 +219,10 @@ export class ErpProductsService {
     };
     const category = this.normalizeShopeeCategory(remote);
     if (!category.name && category.categoryId) {
-      category.name = await this.resolveShopeeCategoryName(category.categoryId);
+      category.name = await this.resolveShopeeCategoryName(
+        context,
+        category.categoryId,
+      );
     }
 
     return {
@@ -1205,12 +1208,15 @@ export class ErpProductsService {
     return parts.length ? parts.join('\n') : fallback ?? '';
   }
 
-  private async resolveShopeeCategoryName(categoryId: string) {
+  private async resolveShopeeCategoryName(
+    context: { shopId: number; accessToken: string },
+    categoryId: string,
+  ) {
     const numericCategoryId = this.optionalNumber(categoryId);
     if (numericCategoryId === undefined) return undefined;
 
     try {
-      const response = await this.productSdk.getCategory('zh-hans');
+      const response = await this.productSdk.getCategoryForShop(context, 'en');
       return this.arrayRecords(
         (response as Record<string, unknown>).category_list ??
           (response as Record<string, unknown>).categories,

@@ -129,6 +129,19 @@ export class ProductSdk {
     });
   }
 
+  getCategoryForShop(
+    context: ShopeeBusinessContext,
+    language = 'en',
+  ): Promise<{ categories: ShopeeCategory[] }> {
+    return this.requestData({
+      method: 'GET',
+      path: '/product/get_category',
+      accessToken: context.accessToken,
+      shopId: context.shopId,
+      query: { language },
+    });
+  }
+
   getAttributeTree(categoryId: number, language = 'en') {
     return this.requestData<{ attribute_list: ShopeeAttribute[] }>({
       method: 'GET',
