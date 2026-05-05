@@ -224,6 +224,9 @@ export class ErpProductsService {
         category.categoryId,
       );
     }
+    if (!category.name) {
+      category.name = category.categoryId;
+    }
 
     return {
       success: true,
