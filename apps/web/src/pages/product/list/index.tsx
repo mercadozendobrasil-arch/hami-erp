@@ -196,6 +196,15 @@ function getDetailStock(detail?: ERP.ProductOnlineDetail, record?: ProductRecord
   return rawStock === undefined ? undefined : Number(rawStock);
 }
 
+function getEditorImages(
+  detail?: ERP.ProductOnlineDetail,
+  record?: ProductRecord,
+) {
+  if (detail?.images?.length) return detail.images;
+  const fallback = record ? getProductImage(record) : undefined;
+  return fallback ? [{ url: String(fallback) }] : [];
+}
+
 const ProductListPage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const actionRef = useRef<ActionType | null>(null);
@@ -671,7 +680,7 @@ const ProductListPage: React.FC = () => {
                           )}
                         </Space>
                         <div className="erp-model-images">
-                          {(editDetail?.images || []).slice(0, 3).map((image) => (
+                          {getEditorImages(editDetail, editingProduct).slice(0, 3).map((image) => (
                             <Image
                               key={image.imageId || image.url}
                               width={64}
@@ -689,7 +698,7 @@ const ProductListPage: React.FC = () => {
                   <Card id="erp-edit-media" title="媒体文件" size="small">
                     <Form.Item label="产品图片">
                       <div className="erp-template-media-grid">
-                        {(editDetail?.images || []).map((image, index) => (
+                        {getEditorImages(editDetail, editingProduct).map((image, index) => (
                           <div className="erp-template-media-item" key={image.imageId || image.url}>
                             <Image
                               width={86}
@@ -700,7 +709,7 @@ const ProductListPage: React.FC = () => {
                             <Typography.Text type="secondary">{index + 1}/9</Typography.Text>
                           </div>
                         ))}
-                        {!editDetail?.images?.length ? (
+                        {!getEditorImages(editDetail, editingProduct).length ? (
                           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
                         ) : null}
                       </div>
