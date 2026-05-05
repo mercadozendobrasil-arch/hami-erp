@@ -217,14 +217,17 @@ export class ErpProductsService {
       ...extraItem,
       ...baseItem,
     };
+    const category = this.normalizeShopeeCategory(remote);
+    if (!category.name && category.categoryId) {
+      category.name = await this.resolveShopeeCategoryName(category.categoryId);
+    }
 
     return {
       success: true,
       data: {
         ...this.toListItem(product),
-        description:
-          this.optionalString(remote.description) ?? product.description ?? '',
-        category: this.normalizeShopeeCategory(remote),
+        description: this.normalizeShopeeDescription(remote, product.description),
+        category,
         brand: this.asRecord(remote.brand),
         attributes: this.normalizeShopeeAttributes(remote),
         images: this.normalizeShopeeImages(remote),
@@ -1164,6 +1167,69 @@ export class ErpProductsService {
           ? result.reason.message
           : String(result.reason),
     };
+  }
+
+  private normalizeShopeeDescription(
+    remote: Record<string, unknown>,
+    fallback?: string | null,
+  ) {
+    const direct = this.optionalString(
+      remote.description ?? remote.item_description ?? remote.itemDescription,
+    );
+    if (direct) return direct;
+
+    const descriptionInfo = this.asRecord(
+      remote.description_info ?? remote.descriptionInfo,
+    );
+    const extendedDescription = this.asRecord(
+      descriptionInfo.extended_description ??
+        descriptionInfo.extendedDescription,
+    );
+    const fields = this.arrayRecords(
+      extendedDescription.field_list ?? extendedDescription.fieldList,
+    );
+    const parts = fields
+      .map((field) => {
+        const textInfo = this.asRecord(field.text_info ?? field.textInfo);
+        const imageInfo = this.asRecord(field.image_info ?? field.imageInfo);
+        return this.optionalString(
+          field.text ??
+            textInfo.text ??
+            textInfo.content ??
+            imageInfo.image_url ??
+            imageInfo.imageUrl,
+        );
+      })
+      .filter(Boolean);
+
+    return parts.length ? parts.join('\n') : fallback ?? '';
+  }
+
+  private async resolveShopeeCategoryName(categoryId: string) {
+    const numericCategoryId = this.optionalNumber(categoryId);
+    if (numericCategoryId === undefined) return undefined;
+
+    try {
+      const response = await this.productSdk.getCategory('zh-hans');
+      return this.arrayRecords(
+        (response as Record<string, unknown>).category_list ??
+          (response as Record<string, unknown>).categories,
+      )
+        .map((category) => ({
+          categoryId: this.optionalNumber(
+            category.category_id ?? category.categoryId,
+          ),
+          name: this.optionalString(
+            category.display_name ??
+              category.category_name ??
+              category.categoryName ??
+              category.name,
+          ),
+        }))
+        .find((category) => category.categoryId === numericCategoryId)?.name;
+    } catch {
+      return undefined;
+    }
   }
 
   private normalizeShopeeCategory(remote: Record<string, unknown>) {
