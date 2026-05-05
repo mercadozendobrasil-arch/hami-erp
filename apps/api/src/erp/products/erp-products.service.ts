@@ -176,10 +176,13 @@ export class ErpProductsService {
         (modelInfo as Record<string, unknown>).model_list,
     );
     const platformRaw = this.asRecord(platformProduct.raw);
+    const onlineUpdate = this.asRecord(platformRaw.onlineUpdate);
+    const onlineResult = this.asRecord(onlineUpdate.result);
     const remote = {
       ...this.asRecord(product.raw),
       ...platformRaw,
       ...this.asRecord(platformRaw.item),
+      ...this.asRecord(onlineResult.item),
       ...extraItem,
       ...baseItem,
     };
