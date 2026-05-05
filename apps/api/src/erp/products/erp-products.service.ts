@@ -158,6 +158,17 @@ export class ErpProductsService {
       accessToken: token.accessToken,
     };
     const itemId = Number(platformProduct.itemId);
+    const latestOnlineUpdateLog =
+      await this.prismaService.erpSkuMappingLog.findFirst({
+        where: {
+          productId,
+          shopId: shopIdRaw,
+          itemId: platformProduct.itemId,
+          action: 'UPDATE_ONLINE_PRODUCT',
+          status: 'SUCCESS',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
     const [baseInfo, extraInfo, modelInfo] = await Promise.all([
       this.productSdk.getItemBaseInfo(context, [itemId]),
@@ -178,11 +189,13 @@ export class ErpProductsService {
     const platformRaw = this.asRecord(platformProduct.raw);
     const onlineUpdate = this.asRecord(platformRaw.onlineUpdate);
     const onlineResult = this.asRecord(onlineUpdate.result);
+    const latestLogResponse = this.asRecord(latestOnlineUpdateLog?.response);
     const remote = {
       ...this.asRecord(product.raw),
       ...platformRaw,
       ...this.asRecord(platformRaw.item),
       ...this.asRecord(onlineResult.item),
+      ...this.asRecord(latestLogResponse.item),
       ...extraItem,
       ...baseItem,
     };
